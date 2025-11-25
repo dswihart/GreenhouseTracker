@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  /* Accessibility: Higher contrast text */
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* Accessibility: Larger base font size for seniors */
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* Accessibility: Larger padding for bottom navigation */
+main {
+  padding-bottom: 6rem;
+}
+
+/* Accessibility: Larger minimum touch targets (48px recommended) */
+button,
+a,
+input,
+select,
+[role="button"] {
+  min-height: 48px;
+}
+
+/* Accessibility: Larger form inputs */
+input, select, textarea {
+  font-size: 18px !important;
+  padding: 14px 16px !important;
+}
+
+/* Accessibility: Better focus indicators */
+*:focus-visible {
+  outline: 3px solid #22c55e !important;
+  outline-offset: 2px;
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Accessibility: Larger text for important elements */
+h1 { font-size: 2rem !important; }
+h2 { font-size: 1.75rem !important; }
+h3 { font-size: 1.5rem !important; }
+
+/* Accessibility: Better button styling */
+.btn-large {
+  padding: 16px 24px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  border-radius: 12px;
+}
