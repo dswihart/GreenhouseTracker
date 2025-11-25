@@ -124,14 +124,25 @@ export default function Dashboard() {
     <div className="p-4 max-w-4xl mx-auto">
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-2xl p-6 mb-6 border border-green-700/30">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">
-          {greeting}, {firstName}! 👋
-        </h2>
-        <p className="text-slate-300 text-lg">
-          {plants.length === 0
-            ? "Ready to start your garden? Add your first plant below!"
-            : `You have ${plants.length} plant${plants.length === 1 ? '' : 's'} growing in your garden.`}
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2">
+              {greeting}, {firstName}! 👋
+            </h2>
+            <p className="text-slate-300 text-lg">
+              {plants.length === 0
+                ? "Ready to start your garden? Add your first plant below!"
+                : `You have ${plants.length} plant${plants.length === 1 ? '' : 's'} growing in your garden.`}
+            </p>
+          </div>
+          <Link
+            href="/settings"
+            className="text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 p-3 rounded-xl transition-colors"
+            title="Settings"
+          >
+            <span className="text-2xl">⚙️</span>
+          </Link>
+        </div>
       </div>
 
       {/* Daily Inspiration */}

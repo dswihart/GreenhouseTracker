@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
-import type { Plant, PlantStage, JournalEntry, Contact } from "@/lib/supabase/types";
+import type { Plant, PlantStage, JournalEntry, Contact, CareSchedule } from "@/lib/supabase/types";
 
 const stageConfig: Record<PlantStage, { label: string; icon: string; color: string }> = {
   seed: { label: "Seed", icon: "🌰", color: "from-amber-600 to-amber-700" },
@@ -36,6 +36,12 @@ export default function PlantDetailPage() {
   const [newContactName, setNewContactName] = useState("");
   const [newContactPhone, setNewContactPhone] = useState("");
   const [addingContact, setAddingContact] = useState(false);
+
+  // Watering state
+  const [careSchedule, setCareSchedule] = useState<CareSchedule | null>(null);
+  const [showWateringModal, setShowWateringModal] = useState(false);
+  const [waterInterval, setWaterInterval] = useState(3);
+  const [savingWater, setSavingWater] = useState(false);
 
   const plantId = params.id as string;
 
@@ -75,6 +81,18 @@ export default function PlantDetailPage() {
 
       if (contactsData) {
         setContacts(contactsData);
+      }
+
+      // Load care schedule
+      const { data: careData } = await supabase
+        .from("care_schedules")
+        .select("*")
+        .eq("plant_id", plantId)
+        .single();
+
+      if (careData) {
+        setCareSchedule(careData);
+        setWaterInterval(careData.water_interval_days);
       }
 
       setLoading(false);
@@ -211,6 +229,95 @@ export default function PlantDetailPage() {
     }
   };
 
+  const handleSetWateringSchedule = async () => {
+    if (!plant) return;
+    setSavingWater(true);
+
+    const today = new Date().toISOString().split("T")[0];
+    const nextDue = new Date(Date.now() + waterInterval * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    if (careSchedule) {
+      // Update existing
+      const { data, error } = await supabase
+        .from("care_schedules")
+        .update({
+          water_interval_days: waterInterval,
+          next_due: nextDue,
+        })
+        .eq("id", careSchedule.id)
+        .select()
+        .single();
+
+      if (data && !error) {
+        setCareSchedule(data);
+      }
+    } else {
+      // Create new
+      const { data, error } = await supabase
+        .from("care_schedules")
+        .insert({
+          plant_id: plant.id,
+          water_interval_days: waterInterval,
+          last_watered: today,
+          next_due: nextDue,
+        })
+        .select()
+        .single();
+
+      if (data && !error) {
+        setCareSchedule(data);
+      }
+    }
+
+    setSavingWater(false);
+    setShowWateringModal(false);
+  };
+
+  const handleMarkWatered = async () => {
+    if (!plant || !careSchedule) return;
+    setSavingWater(true);
+
+    const today = new Date().toISOString().split("T")[0];
+    const nextDue = new Date(Date.now() + careSchedule.water_interval_days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+    const { data, error } = await supabase
+      .from("care_schedules")
+      .update({
+        last_watered: today,
+        next_due: nextDue,
+      })
+      .eq("id", careSchedule.id)
+      .select()
+      .single();
+
+    if (data && !error) {
+      setCareSchedule(data);
+    }
+
+    setSavingWater(false);
+  };
+
+  const getWateringStatus = () => {
+    if (!careSchedule?.next_due) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextDue = new Date(careSchedule.next_due);
+    nextDue.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.ceil((nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return { status: "overdue", text: `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`, color: "text-red-400 bg-red-900/30" };
+    } else if (diffDays === 0) {
+      return { status: "today", text: "Water today!", color: "text-amber-400 bg-amber-900/30" };
+    } else if (diffDays === 1) {
+      return { status: "tomorrow", text: "Water tomorrow", color: "text-blue-400 bg-blue-900/30" };
+    } else {
+      return { status: "upcoming", text: `Water in ${diffDays} days`, color: "text-green-400 bg-green-900/30" };
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-4 text-center min-h-[60vh] flex flex-col items-center justify-center">
@@ -330,6 +437,60 @@ export default function PlantDetailPage() {
             );
           })}
         </div>
+      </section>
+
+      {/* Watering Schedule */}
+      <section className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 rounded-2xl p-5 mb-6 border border-blue-600/40">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="font-bold flex items-center gap-2 text-blue-300">
+            <span className="text-xl">💧</span> Watering
+          </h3>
+          <button
+            onClick={() => setShowWateringModal(true)}
+            className="text-sm text-blue-400 hover:text-blue-300"
+          >
+            {careSchedule ? "Edit" : "+ Set Schedule"}
+          </button>
+        </div>
+
+        {careSchedule ? (
+          <div className="space-y-3">
+            {(() => {
+              const status = getWateringStatus();
+              return status && (
+                <div className={`${status.color} rounded-xl p-4 flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">💧</span>
+                    <span className="font-medium">{status.text}</span>
+                  </div>
+                  <button
+                    onClick={handleMarkWatered}
+                    disabled={savingWater}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {savingWater ? "..." : "Mark Watered"}
+                  </button>
+                </div>
+              );
+            })()}
+            <div className="flex justify-between text-sm text-slate-400">
+              <span>Every {careSchedule.water_interval_days} days</span>
+              {careSchedule.last_watered && (
+                <span>Last: {new Date(careSchedule.last_watered).toLocaleDateString()}</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-slate-400 mb-3">No watering schedule set</p>
+            <button
+              onClick={() => setShowWateringModal(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+            >
+              Set Watering Schedule
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Details */}
@@ -515,6 +676,69 @@ export default function PlantDetailPage() {
           </div>
         )}
       </section>
+
+      {/* Watering Modal */}
+      {showWateringModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span className="text-2xl">💧</span> Watering Schedule
+            </h3>
+
+            <div className="mb-6">
+              <label className="block text-sm text-slate-400 mb-2">
+                Water every:
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="1"
+                  max="14"
+                  value={waterInterval}
+                  onChange={(e) => setWaterInterval(Number(e.target.value))}
+                  className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold min-w-[80px] text-center">
+                  {waterInterval} day{waterInterval !== 1 ? "s" : ""}
+                </div>
+              </div>
+
+              {/* Quick select buttons */}
+              <div className="flex gap-2 mt-4">
+                {[1, 2, 3, 5, 7, 14].map((days) => (
+                  <button
+                    key={days}
+                    onClick={() => setWaterInterval(days)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      waterInterval === days
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    {days}d
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowWateringModal(false)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetWateringSchedule}
+                disabled={savingWater}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white py-3 rounded-xl font-medium transition-colors"
+              >
+                {savingWater ? "Saving..." : careSchedule ? "Update" : "Set Schedule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contact Modal */}
       {showContactModal && (
