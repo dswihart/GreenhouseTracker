@@ -18,6 +18,7 @@ interface ZoneCanvasProps {
   width: number;
   height: number;
   onTransplant?: (plantId: string) => void;
+  onPlantClick?: (plantId: string) => void;
   highlightRow?: number | null;
   contacts?: Contact[];
 }
@@ -28,6 +29,7 @@ export function ZoneCanvas({
   width,
   height,
   onTransplant,
+  onPlantClick,
   highlightRow,
   contacts = [],
 }: ZoneCanvasProps) {
@@ -245,6 +247,8 @@ export function ZoneCanvas({
                 y={displayY * cellUnit}
                 draggable={highlightRow === null}
                 onDragEnd={(e) => handleDragEnd(item.id, e)}
+                onClick={() => onPlantClick?.(item.plant_id)}
+                onTap={() => onPlantClick?.(item.plant_id)}
                 onDblClick={() => onTransplant?.(item.plant_id)}
                 onDblTap={() => onTransplant?.(item.plant_id)}
                 onMouseEnter={(e) => handleMouseEnter(item, e)}

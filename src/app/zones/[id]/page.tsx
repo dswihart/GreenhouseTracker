@@ -72,8 +72,8 @@ export default function ZoneDetailPage() {
   useEffect(() => {
     const updateDimensions = () => {
       setDimensions({
-        width: Math.min(window.innerWidth - 32, 800),
-        height: Math.min(window.innerHeight - 400, 450),
+        width: Math.min(window.innerWidth - 32, 1200),
+        height: Math.min(window.innerHeight - 200, 600),
       });
     };
 
@@ -673,6 +673,7 @@ export default function ZoneDetailPage() {
             width={dimensions.width}
             height={dimensions.height}
             onTransplant={isGreenhouse ? handleTransplantClick : undefined}
+            onPlantClick={(plantId) => router.push(`/plants/${plantId}`)}
             highlightRow={filterRow}
             contacts={contacts}
           />

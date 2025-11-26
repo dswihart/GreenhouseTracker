@@ -65,6 +65,14 @@ export default function PlantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
+  const [editingGermination, setEditingGermination] = useState(false);
+  const [germinationInput, setGerminationInput] = useState("");
+  const [editingHeight, setEditingHeight] = useState(false);
+  const [heightInput, setHeightInput] = useState("");
+  const [editingSpacing, setEditingSpacing] = useState(false);
+  const [spacingInput, setSpacingInput] = useState("");
+  const [editingDepth, setEditingDepth] = useState(false);
+  const [depthInput, setDepthInput] = useState("");
 
   const plantId = params.id as string;
 
@@ -181,6 +189,82 @@ export default function PlantDetailPage() {
   const getAssignedContact = () => {
     if (!plant?.assigned_to) return null;
     return contacts.find((c) => c.id === plant.assigned_to);
+  };
+
+  const handleGerminationSave = async () => {
+    if (!plant) return;
+    setUpdating(true);
+
+    const value = germinationInput.trim() ? parseInt(germinationInput) : null;
+    const { error } = await supabase
+      .from("plants")
+      .update({ germination_days: value })
+      .eq("id", plant.id);
+
+    if (!error) {
+      setPlant({ ...plant, germination_days: value });
+      updatePlant(plant.id, { germination_days: value });
+    }
+
+    setUpdating(false);
+    setEditingGermination(false);
+  };
+
+  const handleHeightSave = async () => {
+    if (!plant) return;
+    setUpdating(true);
+
+    const value = heightInput.trim() ? parseFloat(heightInput) : null;
+    const { error } = await supabase
+      .from("plants")
+      .update({ height_inches: value })
+      .eq("id", plant.id);
+
+    if (!error) {
+      setPlant({ ...plant, height_inches: value });
+      updatePlant(plant.id, { height_inches: value });
+    }
+
+    setUpdating(false);
+    setEditingHeight(false);
+  };
+
+  const handleSpacingSave = async () => {
+    if (!plant) return;
+    setUpdating(true);
+
+    const value = spacingInput.trim() ? parseFloat(spacingInput) : null;
+    const { error } = await supabase
+      .from("plants")
+      .update({ spacing_inches: value })
+      .eq("id", plant.id);
+
+    if (!error) {
+      setPlant({ ...plant, spacing_inches: value });
+      updatePlant(plant.id, { spacing_inches: value });
+    }
+
+    setUpdating(false);
+    setEditingSpacing(false);
+  };
+
+  const handleDepthSave = async () => {
+    if (!plant) return;
+    setUpdating(true);
+
+    const value = depthInput.trim() ? parseFloat(depthInput) : null;
+    const { error } = await supabase
+      .from("plants")
+      .update({ planting_depth_inches: value })
+      .eq("id", plant.id);
+
+    if (!error) {
+      setPlant({ ...plant, planting_depth_inches: value });
+      updatePlant(plant.id, { planting_depth_inches: value });
+    }
+
+    setUpdating(false);
+    setEditingDepth(false);
   };
 
   const handleDelete = async () => {
@@ -325,6 +409,173 @@ export default function PlantDetailPage() {
               <dd>{new Date(plant.date_planted).toLocaleDateString()}</dd>
             </div>
           )}
+          <div className="flex justify-between items-center">
+            <dt className="text-slate-400">Germination Time</dt>
+            <dd>
+              {editingGermination ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={germinationInput}
+                    onChange={(e) => setGerminationInput(e.target.value)}
+                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
+                    placeholder="days"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleGerminationSave}
+                    disabled={updating}
+                    className="text-green-400 hover:text-green-300 text-xs"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingGermination(false)}
+                    className="text-slate-400 hover:text-slate-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setGerminationInput(plant.germination_days?.toString() || "");
+                    setEditingGermination(true);
+                  }}
+                  className="text-slate-200 hover:text-green-400 transition-colors"
+                >
+                  {plant.germination_days ? `${plant.germination_days} days` : "Set..."}
+                </button>
+              )}
+            </dd>
+          </div>
+          <div className="flex justify-between items-center">
+            <dt className="text-slate-400">Planting Depth</dt>
+            <dd>
+              {editingDepth ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    value={depthInput}
+                    onChange={(e) => setDepthInput(e.target.value)}
+                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
+                    placeholder="inches"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleDepthSave}
+                    disabled={updating}
+                    className="text-green-400 hover:text-green-300 text-xs"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingDepth(false)}
+                    className="text-slate-400 hover:text-slate-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setDepthInput(plant.planting_depth_inches?.toString() || "");
+                    setEditingDepth(true);
+                  }}
+                  className="text-slate-200 hover:text-green-400 transition-colors"
+                >
+                  {plant.planting_depth_inches ? `${plant.planting_depth_inches}"` : "Set..."}
+                </button>
+              )}
+            </dd>
+          </div>
+          <div className="flex justify-between items-center">
+            <dt className="text-slate-400">Spacing</dt>
+            <dd>
+              {editingSpacing ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={spacingInput}
+                    onChange={(e) => setSpacingInput(e.target.value)}
+                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
+                    placeholder="inches"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSpacingSave}
+                    disabled={updating}
+                    className="text-green-400 hover:text-green-300 text-xs"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingSpacing(false)}
+                    className="text-slate-400 hover:text-slate-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSpacingInput(plant.spacing_inches?.toString() || "");
+                    setEditingSpacing(true);
+                  }}
+                  className="text-slate-200 hover:text-green-400 transition-colors"
+                >
+                  {plant.spacing_inches ? `${plant.spacing_inches}"` : "Set..."}
+                </button>
+              )}
+            </dd>
+          </div>
+          <div className="flex justify-between items-center">
+            <dt className="text-slate-400">Height</dt>
+            <dd>
+              {editingHeight ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={heightInput}
+                    onChange={(e) => setHeightInput(e.target.value)}
+                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
+                    placeholder="inches"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleHeightSave}
+                    disabled={updating}
+                    className="text-green-400 hover:text-green-300 text-xs"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingHeight(false)}
+                    className="text-slate-400 hover:text-slate-300 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setHeightInput(plant.height_inches?.toString() || "");
+                    setEditingHeight(true);
+                  }}
+                  className="text-slate-200 hover:text-green-400 transition-colors"
+                >
+                  {plant.height_inches ? `${plant.height_inches}"` : "Set..."}
+                </button>
+              )}
+            </dd>
+          </div>
           {plant.days_to_maturity && (
             <div className="flex justify-between">
               <dt className="text-slate-400">Days to Maturity</dt>

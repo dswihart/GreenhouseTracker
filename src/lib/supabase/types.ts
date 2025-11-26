@@ -31,6 +31,10 @@ export interface Database {
           date_planted: string | null;
           transplant_date: string | null;
           days_to_maturity: number | null;
+          germination_days: number | null;
+          height_inches: number | null;
+          spacing_inches: number | null;
+          planting_depth_inches: number | null;
           current_stage: PlantStage;
           created_at: string;
         };
@@ -46,6 +50,10 @@ export interface Database {
           date_planted?: string | null;
           transplant_date?: string | null;
           days_to_maturity?: number | null;
+          germination_days?: number | null;
+          height_inches?: number | null;
+          spacing_inches?: number | null;
+          planting_depth_inches?: number | null;
           current_stage?: PlantStage;
         };
         Update: {
@@ -60,6 +68,10 @@ export interface Database {
           date_planted?: string | null;
           transplant_date?: string | null;
           days_to_maturity?: number | null;
+          germination_days?: number | null;
+          height_inches?: number | null;
+          spacing_inches?: number | null;
+          planting_depth_inches?: number | null;
           current_stage?: PlantStage;
         };
       };
