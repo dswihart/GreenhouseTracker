@@ -18,6 +18,7 @@ const ZoneCanvas = dynamic(
 
 const zoneTypeConfig: Record<ZoneType, { icon: string; label: string; color: string; bgColor: string }> = {
   greenhouse: { icon: "🌿", label: "Greenhouse", color: "from-green-600 to-emerald-700", bgColor: "bg-green-900/20 border-green-700/30" },
+  garden_bed: { icon: "🥕", label: "Garden Bed", color: "from-amber-600 to-orange-700", bgColor: "bg-amber-900/20 border-amber-700/30" },
   indoors: { icon: "🏠", label: "Indoors", color: "from-blue-600 to-indigo-700", bgColor: "bg-blue-900/20 border-blue-700/30" },
 };
 
@@ -45,7 +46,7 @@ export default function ZoneDetailPage() {
     const updateDimensions = () => {
       setDimensions({
         width: Math.min(window.innerWidth - 32, 800),
-        height: Math.min(window.innerHeight - 400, 450),
+        height: Math.min(window.innerHeight - 300, 500),
       });
     };
     updateDimensions();
@@ -464,7 +465,7 @@ export default function ZoneDetailPage() {
       {/* Edit Grid Modal */}
       {showEditGrid && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700">
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
               <span className="text-2xl">📐</span> Edit Grid Size
             </h3>

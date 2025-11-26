@@ -16,7 +16,8 @@ export function Navigation() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-slate-600 px-2 py-2 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t-2 border-slate-600 px-2 pt-2 z-50"
+      style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       role="navigation"
       aria-label="Main navigation"
     >
@@ -35,9 +36,7 @@ export function Navigation() {
                     : "text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
               >
-                {/* Larger icon for better visibility */}
                 <span className="text-3xl" aria-hidden="true">{item.icon}</span>
-                {/* Larger, bolder text label */}
                 <span className="text-sm mt-1 font-medium">{item.label}</span>
               </Link>
             </li>

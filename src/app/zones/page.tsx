@@ -14,6 +14,7 @@ const zoneTypeConfig: Record<ZoneType, { icon: string; label: string; color: str
     color: "from-green-600 to-emerald-700",
     bgColor: "bg-green-900/20 border-green-700/30"
   },
+  garden_bed: { icon: "🥕", label: "Garden Bed", color: "from-amber-600 to-orange-700", bgColor: "bg-amber-900/20 border-amber-700/30" },
   indoors: {
     icon: "🏠",
     label: "Indoors",
@@ -243,7 +244,7 @@ function CreateZoneModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl">
+      <div className="bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-700">
           <h2 className="text-2xl font-bold flex items-center gap-3">
             <span className="text-3xl">🗺️</span>

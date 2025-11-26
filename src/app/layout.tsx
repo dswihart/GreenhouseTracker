@@ -49,7 +49,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <Header />
-          <main className="min-h-screen">{children}</main>
+          <main className="min-h-screen pb-24">{children}</main>
           <Navigation />
         </AuthProvider>
       </body>

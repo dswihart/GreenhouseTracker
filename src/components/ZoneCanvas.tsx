@@ -69,6 +69,8 @@ export function ZoneCanvas({ zone, items, width, height, onTransplant }: ZoneCan
   const getZoneColors = (type: ZoneType) => {
     switch (type) {
       case "greenhouse": return { bg: "#0d2818", cell: "#1a3d2b", border: "#2d5a40" };
+      case "garden_bed": return { bg: "#2d1f0e", cell: "#3d2a15", border: "#5a4020" };
+      case "indoors": return { bg: "#1a1f2e", cell: "#252b3d", border: "#3d4560" };
       default: return { bg: "#1e293b", cell: "#1e293b", border: "#334155" };
     }
   };
