@@ -14,10 +14,25 @@ const stages: { value: PlantStage; label: string }[] = [
   { value: "vegetative", label: "Vegetative" },
 ];
 
+const categories = [
+  { value: "", label: "Select a category..." },
+  { value: "vegetable", label: "Vegetable" },
+  { value: "fruit", label: "Fruit" },
+  { value: "herb", label: "Herb" },
+  { value: "flower", label: "Flower" },
+  { value: "pepper", label: "Pepper" },
+  { value: "tomato", label: "Tomato" },
+  { value: "leafy_green", label: "Leafy Green" },
+  { value: "root_vegetable", label: "Root Vegetable" },
+  { value: "squash", label: "Squash" },
+  { value: "bean", label: "Bean / Legume" },
+  { value: "other", label: "Other" },
+];
+
 export default function NewPlantPage() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { addPlant } = usePlantStore();
+  const { addPlants } = usePlantStore();
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -39,7 +54,9 @@ export default function NewPlantPage() {
   const [formData, setFormData] = useState({
     name: "",
     species: "",
-    date_planted: "", // Will be set when placed in a zone
+    description: "",
+    photo_url: "",
+    category: "",
     days_to_maturity: "",
     current_stage: "seed" as PlantStage,
   });
@@ -61,6 +78,8 @@ export default function NewPlantPage() {
           ...prev,
           name: data.name || prev.name,
           species: data.species || prev.species,
+          description: data.description || prev.description,
+          photo_url: data.imageUrl || prev.photo_url,
           days_to_maturity: data.daysToMaturity?.toString() || prev.days_to_maturity,
         }));
 
@@ -114,20 +133,13 @@ export default function NewPlantPage() {
         user_id: user.id,
         name: quantity > 1 ? `${formData.name} #${i + 1}` : formData.name,
         species: formData.species || null,
-        date_planted: formData.date_planted || null,
+        description: formData.description || null,
+        photo_url: formData.photo_url || null,
+        category: formData.category || null,
         days_to_maturity: formData.days_to_maturity
           ? parseInt(formData.days_to_maturity)
           : null,
         current_stage: formData.current_stage,
-        // Save growing info from barcode scan
-        description: growingInfo?.description || null,
-        sun_requirements: growingInfo?.sunRequirements || null,
-        watering_needs: growingInfo?.wateringNeeds || null,
-        planting_depth: growingInfo?.plantingDepth || null,
-        spacing: growingInfo?.spacing || null,
-        harvest_info: growingInfo?.harvestInfo || null,
-        growing_tips: growingInfo?.growingTips || null,
-        image_url: growingInfo?.imageUrl || null,
       }));
 
       const { data, error: insertError } = await supabase
@@ -138,10 +150,12 @@ export default function NewPlantPage() {
       if (insertError) throw insertError;
 
       if (data) {
-        data.forEach((plant) => addPlant(plant));
+        // Add all plants to store at once to avoid multiple re-renders
+        addPlants(data);
         router.push("/plants");
       }
     } catch (err) {
+      console.error("Error creating plants:", err);
       setError(err instanceof Error ? err.message : "Failed to add plant");
     } finally {
       setLoading(false);
@@ -352,21 +366,39 @@ export default function NewPlantPage() {
         </div>
 
         <div>
-          <label
-            htmlFor="date_planted"
-            className="block text-lg font-medium mb-2"
-          >
-            Date Planted
+          <label htmlFor="description" className="block text-lg font-medium mb-2">
+            Description
           </label>
-          <input
-            id="date_planted"
-            type="date"
-            value={formData.date_planted}
+          <textarea
+            id="description"
+            value={formData.description}
             onChange={(e) =>
-              setFormData({ ...formData, date_planted: e.target.value })
+              setFormData({ ...formData, description: e.target.value })
+            }
+            rows={3}
+            className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg resize-none"
+            placeholder="Notes about this plant..."
+          />
+        </div>
+
+        <div>
+          <label htmlFor="category" className="block text-lg font-medium mb-2">
+            Category
+          </label>
+          <select
+            id="category"
+            value={formData.category}
+            onChange={(e) =>
+              setFormData({ ...formData, category: e.target.value })
             }
             className="w-full px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg"
-          />
+          >
+            {categories.map((cat) => (
+              <option key={cat.value} value={cat.value}>
+                {cat.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

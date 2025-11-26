@@ -3,6 +3,7 @@
 :root {
   --background: #0f172a;
   --foreground: #f1f5f9;
+  /* Accessibility: Higher contrast text */
   --text-primary: #ffffff;
   --text-secondary: #cbd5e1;
 }
@@ -14,35 +15,19 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* iOS Safari: Prevent overscroll bounce */
-html {
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
-  /* iOS Safari: Use dvh for correct viewport height, fallback to vh */
   min-height: 100vh;
-  min-height: 100dvh;
+  /* Accessibility: Larger base font size for seniors */
   font-size: 18px;
   line-height: 1.6;
-  /* iOS: Prevent text size adjustment */
-  -webkit-text-size-adjust: 100%;
-  /* iOS: Prevent overscroll bounce */
-  overscroll-behavior: none;
-  position: fixed;
-  width: 100%;
-  overflow: auto;
 }
 
-/* Main content scrollable container */
+/* Accessibility: Larger padding for bottom navigation */
 main {
   padding-bottom: 6rem;
-  /* iOS safe area */
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
 }
 
 /* Accessibility: Larger minimum touch targets (48px recommended) */
@@ -52,23 +37,12 @@ input,
 select,
 [role="button"] {
   min-height: 48px;
-  /* iOS: Prevent tap highlight */
-  -webkit-tap-highlight-color: transparent;
 }
 
-/* Accessibility: Larger form inputs - prevent iOS zoom */
+/* Accessibility: Larger form inputs */
 input, select, textarea {
   font-size: 18px !important;
   padding: 14px 16px !important;
-  /* iOS: Better appearance */
-  -webkit-appearance: none;
-  border-radius: 12px;
-}
-
-/* iOS: Style date inputs */
-input[type="date"] {
-  -webkit-appearance: none;
-  appearance: none;
 }
 
 /* Accessibility: Better focus indicators */
@@ -92,17 +66,10 @@ h1 { font-size: 2rem !important; }
 h2 { font-size: 1.75rem !important; }
 h3 { font-size: 1.5rem !important; }
 
-/* Canvas touch handling for iOS */
-canvas {
-  touch-action: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* iOS PWA: Status bar area */
-@supports (padding-top: env(safe-area-inset-top)) {
-  header {
-    padding-top: env(safe-area-inset-top);
-  }
+/* Accessibility: Better button styling */
+.btn-large {
+  padding: 16px 24px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  border-radius: 12px;
 }

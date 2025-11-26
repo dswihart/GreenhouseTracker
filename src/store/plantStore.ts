@@ -7,6 +7,7 @@ interface PlantState {
   isLoading: boolean;
   setPlants: (plants: Plant[]) => void;
   addPlant: (plant: Plant) => void;
+  addPlants: (plants: Plant[]) => void;
   updatePlant: (id: string, updates: Partial<Plant>) => void;
   removePlant: (id: string) => void;
   selectPlant: (plant: Plant | null) => void;
@@ -22,6 +23,9 @@ export const usePlantStore = create<PlantState>((set) => ({
 
   addPlant: (plant) =>
     set((state) => ({ plants: [...state.plants, plant] })),
+
+  addPlants: (newPlants) =>
+    set((state) => ({ plants: [...state.plants, ...newPlants] })),
 
   updatePlant: (id, updates) =>
     set((state) => ({

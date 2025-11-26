@@ -1,5 +1,5 @@
-export type PlantStage = "seed" | "seedling" | "vegetative";
-export type ZoneType = "greenhouse" | "indoors";
+export type PlantStage = "seed" | "seedling" | "vegetative" | "flowering" | "harvest_ready";
+export type ZoneType = "greenhouse" | "garden_bed" | "indoors";
 
 export interface Database {
   public: {
@@ -7,48 +7,15 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
-          first_name: string | null;
-          last_name: string | null;
           settings: Record<string, unknown> | null;
         };
         Insert: {
           id: string;
-          first_name?: string | null;
-          last_name?: string | null;
           settings?: Record<string, unknown> | null;
         };
         Update: {
           id?: string;
-          first_name?: string | null;
-          last_name?: string | null;
           settings?: Record<string, unknown> | null;
-        };
-      };
-      contacts: {
-        Row: {
-          id: string;
-          user_id: string;
-          name: string;
-          phone: string | null;
-          email: string | null;
-          notes: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          name: string;
-          phone?: string | null;
-          email?: string | null;
-          notes?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          name?: string;
-          phone?: string | null;
-          email?: string | null;
-          notes?: string | null;
         };
       };
       plants: {
@@ -57,19 +24,14 @@ export interface Database {
           user_id: string;
           name: string;
           species: string | null;
+          description: string | null;
+          photo_url: string | null;
+          category: string | null;
+          assigned_to: string | null;
           date_planted: string | null;
           transplant_date: string | null;
           days_to_maturity: number | null;
           current_stage: PlantStage;
-          contact_id: string | null;
-          description: string | null;
-          sun_requirements: string | null;
-          watering_needs: string | null;
-          planting_depth: string | null;
-          spacing: string | null;
-          harvest_info: string | null;
-          growing_tips: string | null;
-          image_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -77,38 +39,28 @@ export interface Database {
           user_id: string;
           name: string;
           species?: string | null;
+          description?: string | null;
+          photo_url?: string | null;
+          category?: string | null;
+          assigned_to?: string | null;
           date_planted?: string | null;
           transplant_date?: string | null;
           days_to_maturity?: number | null;
           current_stage?: PlantStage;
-          contact_id?: string | null;
-          description?: string | null;
-          sun_requirements?: string | null;
-          watering_needs?: string | null;
-          planting_depth?: string | null;
-          spacing?: string | null;
-          harvest_info?: string | null;
-          growing_tips?: string | null;
-          image_url?: string | null;
         };
         Update: {
           id?: string;
           user_id?: string;
           name?: string;
           species?: string | null;
+          description?: string | null;
+          photo_url?: string | null;
+          category?: string | null;
+          assigned_to?: string | null;
           date_planted?: string | null;
           transplant_date?: string | null;
           days_to_maturity?: number | null;
           current_stage?: PlantStage;
-          contact_id?: string | null;
-          description?: string | null;
-          sun_requirements?: string | null;
-          watering_needs?: string | null;
-          planting_depth?: string | null;
-          spacing?: string | null;
-          harvest_info?: string | null;
-          growing_tips?: string | null;
-          image_url?: string | null;
         };
       };
       zones: {
@@ -142,6 +94,7 @@ export interface Database {
           plant_id: string;
           x: number;
           y: number;
+          assigned_to: string | null;
         };
         Insert: {
           id?: string;
@@ -149,6 +102,7 @@ export interface Database {
           plant_id: string;
           x: number;
           y: number;
+          assigned_to?: string | null;
         };
         Update: {
           id?: string;
@@ -156,6 +110,28 @@ export interface Database {
           plant_id?: string;
           x?: number;
           y?: number;
+          assigned_to?: string | null;
+        };
+      };
+      contacts: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          color: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          color?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          color?: string;
         };
       };
       map_layout: {
@@ -237,4 +213,3 @@ export type MapLayout = Database["public"]["Tables"]["map_layout"]["Row"];
 export type JournalEntry = Database["public"]["Tables"]["journal_entries"]["Row"];
 export type CareSchedule = Database["public"]["Tables"]["care_schedules"]["Row"];
 export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
-export type Profile = Database["public"]["Tables"]["profiles"]["Row"];

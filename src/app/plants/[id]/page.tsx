@@ -6,15 +6,52 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
-import type { Plant, PlantStage, JournalEntry, Contact, CareSchedule } from "@/lib/supabase/types";
+import type { Plant, PlantStage, JournalEntry, Contact, ZoneItem } from "@/lib/supabase/types";
 
-const stageConfig: Record<PlantStage, { label: string; icon: string; color: string }> = {
-  seed: { label: "Seed", icon: "🌰", color: "from-amber-600 to-amber-700" },
-  seedling: { label: "Seedling", icon: "🌱", color: "from-lime-600 to-lime-700" },
-  vegetative: { label: "Vegetative", icon: "🌿", color: "from-green-600 to-green-700" },
+const stageLabels: Record<PlantStage, string> = {
+  seed: "Seed",
+  seedling: "Seedling",
+  vegetative: "Vegetative",
+  flowering: "Flowering",
+  harvest_ready: "Harvest Ready",
 };
 
-const stages: PlantStage[] = ["seed", "seedling", "vegetative"];
+const stages: PlantStage[] = [
+  "seed",
+  "seedling",
+  "vegetative",
+  "flowering",
+  "harvest_ready",
+];
+
+const categories = [
+  { value: "", label: "None" },
+  { value: "vegetable", label: "Vegetable" },
+  { value: "fruit", label: "Fruit" },
+  { value: "herb", label: "Herb" },
+  { value: "flower", label: "Flower" },
+  { value: "pepper", label: "Pepper" },
+  { value: "tomato", label: "Tomato" },
+  { value: "leafy_green", label: "Leafy Green" },
+  { value: "root_vegetable", label: "Root Vegetable" },
+  { value: "squash", label: "Squash" },
+  { value: "bean", label: "Bean / Legume" },
+  { value: "other", label: "Other" },
+];
+
+const categoryLabels: Record<string, string> = {
+  vegetable: "Vegetable",
+  fruit: "Fruit",
+  herb: "Herb",
+  flower: "Flower",
+  pepper: "Pepper",
+  tomato: "Tomato",
+  leafy_green: "Leafy Green",
+  root_vegetable: "Root Vegetable",
+  squash: "Squash",
+  bean: "Bean / Legume",
+  other: "Other",
+};
 
 export default function PlantDetailPage() {
   const params = useParams();
@@ -24,32 +61,17 @@ export default function PlantDetailPage() {
   const [plant, setPlant] = useState<Plant | null>(null);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [zoneItem, setZoneItem] = useState<ZoneItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-
-  // Quick note state
-  const [newNote, setNewNote] = useState("");
-  const [addingNote, setAddingNote] = useState(false);
-
-  // Contact state
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [newContactName, setNewContactName] = useState("");
-  const [newContactPhone, setNewContactPhone] = useState("");
-  const [addingContact, setAddingContact] = useState(false);
-
-  // Watering state
-  const [careSchedule, setCareSchedule] = useState<CareSchedule | null>(null);
-  const [showWateringModal, setShowWateringModal] = useState(false);
-  const [waterInterval, setWaterInterval] = useState(3);
-  const [savingWater, setSavingWater] = useState(false);
+  const [showAssignMenu, setShowAssignMenu] = useState(false);
 
   const plantId = params.id as string;
 
   useEffect(() => {
     if (!user || !plantId) return;
 
-    const loadData = async () => {
-      // Load plant
+    const loadPlant = async () => {
       const { data: plantData } = await supabase
         .from("plants")
         .select("*")
@@ -61,7 +83,6 @@ export default function PlantDetailPage() {
         setPlant(plantData);
       }
 
-      // Load journal entries
       const { data: journalData } = await supabase
         .from("journal_entries")
         .select("*")
@@ -76,29 +97,32 @@ export default function PlantDetailPage() {
       const { data: contactsData } = await supabase
         .from("contacts")
         .select("*")
-        .eq("user_id", user.id)
-        .order("name", { ascending: true });
+        .eq("user_id", user.id);
 
       if (contactsData) {
-        setContacts(contactsData);
+        const colors = ["#22c55e", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#06b6d4", "#a855f7"];
+        const contactsWithColors = contactsData.map((contact, index) => ({
+          ...contact,
+          color: colors[index % colors.length]
+        }));
+        setContacts(contactsWithColors);
       }
 
-      // Load care schedule
-      const { data: careData } = await supabase
-        .from("care_schedules")
+      // Load zone item for this plant (if placed in a zone)
+      const { data: zoneItemData } = await supabase
+        .from("zone_items")
         .select("*")
         .eq("plant_id", plantId)
         .single();
 
-      if (careData) {
-        setCareSchedule(careData);
-        setWaterInterval(careData.water_interval_days);
+      if (zoneItemData) {
+        setZoneItem(zoneItemData);
       }
 
       setLoading(false);
     };
 
-    loadData();
+    loadPlant();
   }, [user, plantId]);
 
   const handleStageChange = async (newStage: PlantStage) => {
@@ -118,109 +142,51 @@ export default function PlantDetailPage() {
     setUpdating(false);
   };
 
-  const handleAddNote = async () => {
-    if (!plant || !newNote.trim()) return;
-    setAddingNote(true);
+  const handleCategoryChange = async (newCategory: string) => {
+    if (!plant) return;
+    setUpdating(true);
 
-    const { data, error } = await supabase
-      .from("journal_entries")
-      .insert({
-        plant_id: plant.id,
-        notes: newNote.trim(),
-      })
-      .select()
-      .single();
-
-    if (data && !error) {
-      setJournal([data, ...journal]);
-      setNewNote("");
-    }
-
-    setAddingNote(false);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    if (!confirm("Delete this note?")) return;
-
+    const categoryValue = newCategory || null;
     const { error } = await supabase
-      .from("journal_entries")
-      .delete()
-      .eq("id", noteId);
+      .from("plants")
+      .update({ category: categoryValue })
+      .eq("id", plant.id);
 
     if (!error) {
-      setJournal(journal.filter((j) => j.id !== noteId));
+      setPlant({ ...plant, category: categoryValue });
+      updatePlant(plant.id, { category: categoryValue });
     }
+
+    setUpdating(false);
   };
 
   const handleAssignContact = async (contactId: string | null) => {
     if (!plant) return;
+    setUpdating(true);
 
     const { error } = await supabase
       .from("plants")
-      .update({ contact_id: contactId })
+      .update({ assigned_to: contactId })
       .eq("id", plant.id);
 
     if (!error) {
-      setPlant({ ...plant, contact_id: contactId });
+      setPlant({ ...plant, assigned_to: contactId });
+      updatePlant(plant.id, { assigned_to: contactId });
     }
+
+    setUpdating(false);
+    setShowAssignMenu(false);
   };
 
-  const handleAddContact = async () => {
-    if (!user || !newContactName.trim()) return;
-    setAddingContact(true);
-
-    const { data, error } = await supabase
-      .from("contacts")
-      .insert({
-        user_id: user.id,
-        name: newContactName.trim(),
-        phone: newContactPhone.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (data && !error) {
-      setContacts([...contacts, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewContactName("");
-      setNewContactPhone("");
-      // Auto-assign to current plant
-      handleAssignContact(data.id);
-      setShowContactModal(false);
-    }
-
-    setAddingContact(false);
-  };
-
-  const handleDeleteContact = async (contactId: string) => {
-    if (!confirm("Delete this contact? Plants assigned to them will be unassigned.")) return;
-
-    // Unassign from any plants first
-    await supabase
-      .from("plants")
-      .update({ contact_id: null })
-      .eq("contact_id", contactId);
-
-    const { error } = await supabase
-      .from("contacts")
-      .delete()
-      .eq("id", contactId);
-
-    if (!error) {
-      setContacts(contacts.filter((c) => c.id !== contactId));
-      if (plant?.contact_id === contactId) {
-        setPlant({ ...plant, contact_id: null });
-      }
-    }
+  const getAssignedContact = () => {
+    if (!plant?.assigned_to) return null;
+    return contacts.find((c) => c.id === plant.assigned_to);
   };
 
   const handleDelete = async () => {
-    if (!plant || !confirm("Delete this plant and all its journal entries?")) return;
+    if (!plant || !confirm("Are you sure you want to delete this plant?"))
+      return;
 
-    // Delete journal entries first
-    await supabase.from("journal_entries").delete().eq("plant_id", plant.id);
-    // Delete zone items
-    await supabase.from("zone_items").delete().eq("plant_id", plant.id);
-    // Delete plant
     const { error } = await supabase.from("plants").delete().eq("id", plant.id);
 
     if (!error) {
@@ -229,605 +195,291 @@ export default function PlantDetailPage() {
     }
   };
 
-  const handleSetWateringSchedule = async () => {
-    if (!plant) return;
-    setSavingWater(true);
-
-    const today = new Date().toISOString().split("T")[0];
-    const nextDue = new Date(Date.now() + waterInterval * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
-    if (careSchedule) {
-      // Update existing
-      const { data, error } = await supabase
-        .from("care_schedules")
-        .update({
-          water_interval_days: waterInterval,
-          next_due: nextDue,
-        })
-        .eq("id", careSchedule.id)
-        .select()
-        .single();
-
-      if (data && !error) {
-        setCareSchedule(data);
-      }
-    } else {
-      // Create new
-      const { data, error } = await supabase
-        .from("care_schedules")
-        .insert({
-          plant_id: plant.id,
-          water_interval_days: waterInterval,
-          last_watered: today,
-          next_due: nextDue,
-        })
-        .select()
-        .single();
-
-      if (data && !error) {
-        setCareSchedule(data);
-      }
-    }
-
-    setSavingWater(false);
-    setShowWateringModal(false);
+  const getHarvestDate = () => {
+    if (!plant?.date_planted || !plant?.days_to_maturity) return null;
+    const harvest = new Date(plant.date_planted);
+    harvest.setDate(harvest.getDate() + plant.days_to_maturity);
+    return harvest;
   };
 
-  const handleMarkWatered = async () => {
-    if (!plant || !careSchedule) return;
-    setSavingWater(true);
-
-    const today = new Date().toISOString().split("T")[0];
-    const nextDue = new Date(Date.now() + careSchedule.water_interval_days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
-    const { data, error } = await supabase
-      .from("care_schedules")
-      .update({
-        last_watered: today,
-        next_due: nextDue,
-      })
-      .eq("id", careSchedule.id)
-      .select()
-      .single();
-
-    if (data && !error) {
-      setCareSchedule(data);
-    }
-
-    setSavingWater(false);
-  };
-
-  const getWateringStatus = () => {
-    if (!careSchedule?.next_due) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const nextDue = new Date(careSchedule.next_due);
-    nextDue.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.ceil((nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) {
-      return { status: "overdue", text: `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`, color: "text-red-400 bg-red-900/30" };
-    } else if (diffDays === 0) {
-      return { status: "today", text: "Water today!", color: "text-amber-400 bg-amber-900/30" };
-    } else if (diffDays === 1) {
-      return { status: "tomorrow", text: "Water tomorrow", color: "text-blue-400 bg-blue-900/30" };
-    } else {
-      return { status: "upcoming", text: `Water in ${diffDays} days`, color: "text-green-400 bg-green-900/30" };
-    }
+  const getDaysRemaining = () => {
+    const harvestDate = getHarvestDate();
+    if (!harvestDate) return null;
+    const now = new Date();
+    return Math.ceil(
+      (harvestDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
   };
 
   if (loading) {
     return (
-      <div className="p-4 text-center min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="text-6xl mb-4 animate-bounce">🌱</div>
-        <p className="text-slate-400 text-lg">Loading plant...</p>
-      </div>
+      <div className="p-4 text-center text-slate-400">Loading plant...</div>
     );
   }
 
   if (!plant) {
     return (
-      <div className="p-4 text-center min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="text-6xl mb-4">❓</div>
-        <p className="text-slate-400 mb-4 text-xl">Plant not found</p>
-        <Link href="/plants" className="text-green-400 hover:text-green-300 text-lg font-medium">
-          ← Back to plants
+      <div className="p-4 text-center">
+        <p className="text-slate-400 mb-4">Plant not found</p>
+        <Link href="/plants" className="text-green-400 hover:text-green-300">
+          Back to plants
         </Link>
       </div>
     );
   }
 
-  const assignedContact = contacts.find((c) => c.id === plant.contact_id);
-  const currentStage = stageConfig[plant.current_stage];
+  const harvestDate = getHarvestDate();
+  const daysRemaining = getDaysRemaining();
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/plants" className="inline-flex items-center gap-2 text-slate-400 hover:text-green-400 mb-3 transition-colors">
-          <span>←</span> Back to plants
-        </Link>
-
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 border border-slate-700">
-          {/* Plant Image */}
-          {plant.image_url && (
-            <div className="mb-4 -mt-2 -mx-2">
-              <img
-                src={plant.image_url}
-                alt={`${plant.name} mature plant`}
-                className="w-full h-48 object-cover rounded-xl"
-              />
-              <p className="text-xs text-slate-500 text-center mt-1">Reference: What it looks like when mature</p>
-            </div>
-          )}
-
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-4">
-              <span className="text-5xl">{currentStage.icon}</span>
-              <div>
-                <h2 className="text-2xl font-bold">{plant.name}</h2>
-                {plant.species && <p className="text-slate-400">{plant.species}</p>}
-                <span className={`text-sm px-3 py-1 rounded-full font-medium bg-gradient-to-r ${currentStage.color} inline-block mt-2`}>
-                  {currentStage.label}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleDelete}
-              className="text-red-400 hover:text-red-300 bg-red-900/20 hover:bg-red-900/40 px-3 py-2 rounded-xl transition-colors text-sm"
-            >
-              🗑️
-            </button>
-          </div>
-
-          {/* Assigned Contact */}
-          <div className="mt-4 pt-4 border-t border-slate-700">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Going to:</span>
-              {assignedContact ? (
-                <div className="flex items-center gap-2">
-                  <span className="bg-purple-600/30 text-purple-300 px-3 py-1 rounded-full text-sm font-medium">
-                    👤 {assignedContact.name}
-                  </span>
-                  <button
-                    onClick={() => handleAssignContact(null)}
-                    className="text-slate-400 hover:text-red-400 text-sm"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowContactModal(true)}
-                  className="text-sm text-purple-400 hover:text-purple-300"
-                >
-                  + Assign contact
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Growth Stage */}
-      <section className="bg-slate-800/80 rounded-2xl p-5 mb-6 border border-slate-700/50">
-        <h3 className="font-bold mb-4 flex items-center gap-2">
-          <span className="text-xl">📊</span> Growth Stage
-        </h3>
-        <div className="flex gap-2">
-          {stages.map((stage) => {
-            const config = stageConfig[stage];
-            const isActive = plant.current_stage === stage;
-            return (
-              <button
-                key={stage}
-                onClick={() => handleStageChange(stage)}
-                disabled={updating}
-                className={`flex-1 p-3 rounded-xl transition-all ${
-                  isActive
-                    ? `bg-gradient-to-r ${config.color} text-white shadow-lg`
-                    : "bg-slate-700/50 text-slate-400 hover:bg-slate-700"
-                }`}
-              >
-                <span className="text-2xl block mb-1">{config.icon}</span>
-                <span className="text-sm font-medium">{config.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Watering Schedule */}
-      <section className="bg-gradient-to-br from-blue-900/40 to-cyan-900/40 rounded-2xl p-5 mb-6 border border-blue-600/40">
         <div className="flex justify-between items-start mb-4">
-          <h3 className="font-bold flex items-center gap-2 text-blue-300">
-            <span className="text-xl">💧</span> Watering
-          </h3>
+          <div>
+            <Link
+              href="/plants"
+              className="text-slate-400 hover:text-slate-300 text-sm mb-2 inline-block"
+            >
+              &larr; Back to plants
+            </Link>
+            <h2 className="text-2xl font-bold">{plant.name}</h2>
+            {plant.species && (
+              <p className="text-slate-400">{plant.species}</p>
+            )}
+          </div>
           <button
-            onClick={() => setShowWateringModal(true)}
-            className="text-sm text-blue-400 hover:text-blue-300"
+            onClick={handleDelete}
+            className="text-red-400 hover:text-red-300 text-sm"
           >
-            {careSchedule ? "Edit" : "+ Set Schedule"}
+            Delete
           </button>
         </div>
 
-        {careSchedule ? (
-          <div className="space-y-3">
-            {(() => {
-              const status = getWateringStatus();
-              return status && (
-                <div className={`${status.color} rounded-xl p-4 flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">💧</span>
-                    <span className="font-medium">{status.text}</span>
-                  </div>
-                  <button
-                    onClick={handleMarkWatered}
-                    disabled={savingWater}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    {savingWater ? "..." : "Mark Watered"}
-                  </button>
-                </div>
-              );
-            })()}
-            <div className="flex justify-between text-sm text-slate-400">
-              <span>Every {careSchedule.water_interval_days} days</span>
-              {careSchedule.last_watered && (
-                <span>Last: {new Date(careSchedule.last_watered).toLocaleDateString()}</span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-slate-400 mb-3">No watering schedule set</p>
-            <button
-              onClick={() => setShowWateringModal(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-            >
-              Set Watering Schedule
-            </button>
+        {/* Photo and Description */}
+        {(plant.photo_url || plant.description) && (
+          <div className="bg-slate-800 rounded-lg overflow-hidden">
+            {plant.photo_url && (
+              <img
+                src={plant.photo_url}
+                alt={plant.name}
+                className="w-full h-48 object-cover"
+              />
+            )}
+            {plant.description && (
+              <p className="p-4 text-slate-300 text-sm">{plant.description}</p>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Stage Progress */}
+      <section className="bg-slate-800 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold mb-3">Growth Stage</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {stages.map((stage) => (
+            <button
+              key={stage}
+              onClick={() => handleStageChange(stage)}
+              disabled={updating}
+              className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                plant.current_stage === stage
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              {stageLabels[stage]}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Category */}
+      <section className="bg-slate-800 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold mb-3">Category</h3>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => handleCategoryChange(cat.value)}
+              disabled={updating}
+              className={`px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                (plant.category || "") === cat.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Details */}
-      {(plant.date_planted || plant.days_to_maturity) && (
-        <section className="bg-slate-800/80 rounded-2xl p-5 mb-6 border border-slate-700/50">
-          <h3 className="font-bold mb-4 flex items-center gap-2">
-            <span className="text-xl">📅</span> Details
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            {plant.date_planted && (
-              <div className="bg-slate-700/30 rounded-xl p-3">
-                <div className="text-sm text-slate-400">Planted</div>
-                <div className="font-bold">{new Date(plant.date_planted).toLocaleDateString()}</div>
-              </div>
-            )}
-            {plant.days_to_maturity && (
-              <div className="bg-slate-700/30 rounded-xl p-3">
-                <div className="text-sm text-slate-400">Days to Maturity</div>
-                <div className="font-bold">{plant.days_to_maturity} days</div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Growing Info */}
-      {(plant.description || plant.sun_requirements || plant.watering_needs || plant.planting_depth || plant.spacing || plant.harvest_info || plant.growing_tips) && (
-        <section className="bg-gradient-to-br from-emerald-900/40 to-teal-900/40 rounded-2xl p-5 mb-6 border border-emerald-600/40">
-          {/* Description */}
-          {plant.description && (
-            <div className="mb-4 p-3 bg-slate-800/50 rounded-xl">
-              <p className="text-slate-200">{plant.description}</p>
+      <section className="bg-slate-800 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold mb-3">Details</h3>
+        <dl className="space-y-2 text-sm">
+          {plant.date_planted && (
+            <div className="flex justify-between">
+              <dt className="text-slate-400">Date Planted</dt>
+              <dd>{new Date(plant.date_planted).toLocaleDateString()}</dd>
             </div>
           )}
-          <h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-300">
-            <span className="text-xl">🌱</span> Growing Information
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            {plant.sun_requirements && (
-              <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3">
-                <span className="text-2xl">☀️</span>
-                <div>
-                  <div className="text-xs text-slate-400">Sun</div>
-                  <div className="text-sm font-medium">{plant.sun_requirements}</div>
-                </div>
-              </div>
-            )}
-            {plant.watering_needs && (
-              <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3">
-                <span className="text-2xl">💧</span>
-                <div>
-                  <div className="text-xs text-slate-400">Water</div>
-                  <div className="text-sm font-medium">{plant.watering_needs}</div>
-                </div>
-              </div>
-            )}
-            {plant.planting_depth && (
-              <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3">
-                <span className="text-2xl">📏</span>
-                <div>
-                  <div className="text-xs text-slate-400">Planting Depth</div>
-                  <div className="text-sm font-medium">{plant.planting_depth}</div>
-                </div>
-              </div>
-            )}
-            {plant.spacing && (
-              <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3">
-                <span className="text-2xl">↔️</span>
-                <div>
-                  <div className="text-xs text-slate-400">Spacing</div>
-                  <div className="text-sm font-medium">{plant.spacing}</div>
-                </div>
-              </div>
-            )}
-            {plant.harvest_info && (
-              <div className="bg-slate-800/50 rounded-xl p-3 flex items-start gap-3 col-span-2">
-                <span className="text-2xl">🥬</span>
-                <div>
-                  <div className="text-xs text-slate-400">Harvest</div>
-                  <div className="text-sm font-medium">{plant.harvest_info}</div>
-                </div>
-              </div>
-            )}
-            {plant.growing_tips && (
-              <div className="bg-amber-900/30 border border-amber-600/30 rounded-xl p-3 flex items-start gap-3 col-span-2">
-                <span className="text-2xl">💡</span>
-                <div>
-                  <div className="text-xs text-amber-400">Growing Tips</div>
-                  <div className="text-sm text-amber-100">{plant.growing_tips}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Quick Actions */}
-      <section className="grid grid-cols-2 gap-4 mb-6">
-        <Link
-          href={`/doctor?plant=${plant.id}`}
-          className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white p-4 rounded-2xl text-center transition-colors shadow-lg"
-        >
-          <span className="text-3xl block mb-2">🩺</span>
-          <span className="font-bold">AI Doctor</span>
-        </Link>
-        <button
-          onClick={() => setShowContactModal(true)}
-          className="bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white p-4 rounded-2xl text-center transition-colors shadow-lg"
-        >
-          <span className="text-3xl block mb-2">👥</span>
-          <span className="font-bold">Contacts</span>
-        </button>
+          {plant.days_to_maturity && (
+            <div className="flex justify-between">
+              <dt className="text-slate-400">Days to Maturity</dt>
+              <dd>{plant.days_to_maturity} days</dd>
+            </div>
+          )}
+          {harvestDate && (
+            <div className="flex justify-between">
+              <dt className="text-slate-400">Est. Harvest Date</dt>
+              <dd className="text-green-400">
+                {harvestDate.toLocaleDateString()}
+              </dd>
+            </div>
+          )}
+          {daysRemaining !== null && (
+            <div className="flex justify-between">
+              <dt className="text-slate-400">Days Remaining</dt>
+              <dd
+                className={
+                  daysRemaining <= 7 ? "text-orange-400" : "text-slate-200"
+                }
+              >
+                {daysRemaining > 0 ? `${daysRemaining} days` : "Ready!"}
+              </dd>
+            </div>
+          )}
+        </dl>
       </section>
 
-      {/* Add Note */}
-      <section className="bg-slate-800/80 rounded-2xl p-5 mb-6 border border-slate-700/50">
-        <h3 className="font-bold mb-4 flex items-center gap-2">
-          <span className="text-xl">📝</span> Add Note
-        </h3>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Type a note about this plant..."
-            className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-            onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
-          />
+      {/* Assigned To */}
+      <section className="bg-slate-800 rounded-lg p-4 mb-6">
+        <h3 className="font-semibold mb-3">Assigned To</h3>
+        <div className="relative">
           <button
-            onClick={handleAddNote}
-            disabled={addingNote || !newNote.trim()}
-            className="bg-green-600 hover:bg-green-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+            onClick={() => setShowAssignMenu(!showAssignMenu)}
+            disabled={updating}
+            className="w-full flex items-center justify-between px-3 py-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
           >
-            {addingNote ? "..." : "Add"}
+            {getAssignedContact() ? (
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{ backgroundColor: getAssignedContact()?.color || "#22c55e" }}
+                >
+                  {getAssignedContact()?.name.charAt(0).toUpperCase()}
+                </div>
+                <span>{getAssignedContact()?.name}</span>
+              </div>
+            ) : (
+              <span className="text-slate-400">Not assigned</span>
+            )}
+            <svg
+              className={`w-4 h-4 transition-transform ${showAssignMenu ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
+
+          {showAssignMenu && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 rounded-lg shadow-lg z-10 overflow-hidden">
+              <button
+                onClick={() => handleAssignContact(null)}
+                className="w-full px-3 py-2 text-left hover:bg-slate-600 transition-colors flex items-center gap-2"
+              >
+                <div className="w-6 h-6 rounded-full bg-slate-500 flex items-center justify-center text-white text-xs">
+                  —
+                </div>
+                <span className="text-slate-400">Unassigned</span>
+              </button>
+              {contacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => handleAssignContact(contact.id)}
+                  className={`w-full px-3 py-2 text-left hover:bg-slate-600 transition-colors flex items-center gap-2 ${
+                    plant?.assigned_to === contact.id ? "bg-slate-600" : ""
+                  }`}
+                >
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: contact.color }}
+                  >
+                    {contact.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span>{contact.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Journal History */}
+      {/* Actions */}
+      <section className="grid grid-cols-2 gap-4 mb-6">
+        <Link
+          href={`/doctor?plant=${plant.id}`}
+          className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-center transition-colors"
+        >
+          <span className="text-xl block mb-1">🩺</span>
+          AI Doctor
+        </Link>
+        <Link
+          href={`/plants/${plant.id}/journal/new`}
+          className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-lg text-center transition-colors"
+        >
+          <span className="text-xl block mb-1">📝</span>
+          Add Journal Entry
+        </Link>
+      </section>
+
+      {/* Journal */}
       <section>
-        <h3 className="font-bold mb-4 flex items-center gap-2">
-          <span className="text-xl">📖</span> Journal ({journal.length})
-        </h3>
+        <h3 className="font-semibold mb-3">Journal History</h3>
         {journal.length === 0 ? (
-          <div className="bg-slate-800/50 rounded-2xl p-6 text-center border border-slate-700/50">
-            <div className="text-4xl mb-2">📭</div>
-            <p className="text-slate-400">No journal entries yet</p>
-            <p className="text-slate-500 text-sm mt-1">Add your first note above!</p>
+          <div className="bg-slate-800 rounded-lg p-4 text-center text-slate-400">
+            No journal entries yet
           </div>
         ) : (
           <div className="space-y-3">
             {journal.map((entry) => (
-              <div key={entry.id} className="bg-slate-800/80 rounded-xl p-4 border border-slate-700/50">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-sm text-slate-400">
-                    {new Date(entry.created_at).toLocaleString()}
-                  </span>
-                  <div className="flex items-center gap-2">
+              <div key={entry.id} className="bg-slate-800 rounded-lg overflow-hidden">
+                {entry.photo_url && (
+                  <img
+                    src={entry.photo_url}
+                    alt="Journal entry photo"
+                    className="w-full h-48 object-cover"
+                  />
+                )}
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs text-slate-400">
+                      {new Date(entry.created_at).toLocaleString()}
+                    </span>
                     {entry.ai_diagnosis && (
-                      <span className="text-xs bg-blue-600 px-2 py-1 rounded-full">
-                        🩺 AI
+                      <span className="text-xs bg-blue-600 px-2 py-0.5 rounded">
+                        AI Analyzed
                       </span>
                     )}
-                    <button
-                      onClick={() => handleDeleteNote(entry.id)}
-                      className="text-slate-500 hover:text-red-400 text-sm transition-colors"
-                    >
-                      ✕
-                    </button>
                   </div>
+                  {entry.notes && <p className="text-sm">{entry.notes}</p>}
+                  {entry.ai_diagnosis && (
+                    <div className="mt-2 p-2 bg-slate-700 rounded text-xs">
+                      <strong>Diagnosis:</strong>{" "}
+                      {(entry.ai_diagnosis as { diagnosis?: string }).diagnosis ||
+                        "N/A"}
+                    </div>
+                  )}
                 </div>
-                {entry.notes && <p className="text-slate-200">{entry.notes}</p>}
-                {entry.ai_diagnosis && (
-                  <div className="mt-3 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm">
-                    <strong className="text-blue-300">Diagnosis:</strong>{" "}
-                    <span className="text-slate-300">
-                      {(entry.ai_diagnosis as { diagnosis?: string }).diagnosis || "N/A"}
-                    </span>
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
       </section>
-
-      {/* Watering Modal */}
-      {showWateringModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span className="text-2xl">💧</span> Watering Schedule
-            </h3>
-
-            <div className="mb-6">
-              <label className="block text-sm text-slate-400 mb-2">
-                Water every:
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="14"
-                  value={waterInterval}
-                  onChange={(e) => setWaterInterval(Number(e.target.value))}
-                  className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                />
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold min-w-[80px] text-center">
-                  {waterInterval} day{waterInterval !== 1 ? "s" : ""}
-                </div>
-              </div>
-
-              {/* Quick select buttons */}
-              <div className="flex gap-2 mt-4">
-                {[1, 2, 3, 5, 7, 14].map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => setWaterInterval(days)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      waterInterval === days
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                    }`}
-                  >
-                    {days}d
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowWateringModal(false)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSetWateringSchedule}
-                disabled={savingWater}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white py-3 rounded-xl font-medium transition-colors"
-              >
-                {savingWater ? "Saving..." : careSchedule ? "Update" : "Set Schedule"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Contact Modal */}
-      {showContactModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-slate-700 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span className="text-2xl">👥</span> Contacts
-            </h3>
-
-            {/* Add New Contact */}
-            <div className="bg-slate-700/50 rounded-xl p-4 mb-4">
-              <h4 className="font-medium mb-3 text-sm text-slate-300">Add New Contact</h4>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  placeholder="Name *"
-                  className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <input
-                  type="tel"
-                  value={newContactPhone}
-                  onChange={(e) => setNewContactPhone(e.target.value)}
-                  placeholder="Phone (optional)"
-                  className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  onClick={handleAddContact}
-                  disabled={addingContact || !newContactName.trim()}
-                  className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white py-2 rounded-lg font-medium transition-colors"
-                >
-                  {addingContact ? "Adding..." : "+ Add & Assign"}
-                </button>
-              </div>
-            </div>
-
-            {/* Contact List */}
-            {contacts.length > 0 && (
-              <div className="mb-4">
-                <h4 className="font-medium mb-3 text-sm text-slate-300">Select Contact</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {contacts.map((contact) => {
-                    const isAssigned = plant.contact_id === contact.id;
-                    return (
-                      <div
-                        key={contact.id}
-                        className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
-                          isAssigned
-                            ? "bg-purple-600/30 border border-purple-500"
-                            : "bg-slate-700/50 hover:bg-slate-700"
-                        }`}
-                      >
-                        <button
-                          onClick={() => handleAssignContact(isAssigned ? null : contact.id)}
-                          className="flex-1 text-left"
-                        >
-                          <div className="font-medium">{contact.name}</div>
-                          {contact.phone && (
-                            <div className="text-sm text-slate-400">{contact.phone}</div>
-                          )}
-                        </button>
-                        <div className="flex items-center gap-2">
-                          {isAssigned && (
-                            <span className="text-xs text-purple-300">Assigned</span>
-                          )}
-                          <button
-                            onClick={() => handleDeleteContact(contact.id)}
-                            className="text-slate-500 hover:text-red-400 p-1 transition-colors"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowContactModal(false)}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-medium transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
