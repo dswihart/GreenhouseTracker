@@ -21,8 +21,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Greenhouse Tracker",
+    statusBarStyle: "black-translucent",
+    title: "Greenhouse",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -32,6 +35,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -42,7 +46,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* iOS PWA */}
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Greenhouse" />
+        {/* iOS splash screens would go here */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-900 text-slate-100`}
