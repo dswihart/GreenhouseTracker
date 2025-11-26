@@ -400,16 +400,16 @@ export default function PlantDetailPage() {
       </section>
 
       {/* Details */}
-      <section className="bg-slate-800 rounded-lg p-4 mb-6">
-        <h3 className="font-semibold mb-3">Details</h3>
-        <dl className="space-y-2 text-sm">
+      <section className="bg-slate-800 rounded-lg p-5 mb-6">
+        <h3 className="font-semibold mb-4 text-lg">Details</h3>
+        <dl className="divide-y divide-slate-700">
           {plant.date_planted && (
-            <div className="flex justify-between">
-              <dt className="text-slate-400">Date Planted</dt>
+            <div className="flex justify-between py-3">
+              <dt className="text-slate-400">Date Added</dt>
               <dd>{new Date(plant.date_planted).toLocaleDateString()}</dd>
             </div>
           )}
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center py-3">
             <dt className="text-slate-400">Germination Time</dt>
             <dd>
               {editingGermination ? (
@@ -419,20 +419,20 @@ export default function PlantDetailPage() {
                     min="1"
                     value={germinationInput}
                     onChange={(e) => setGerminationInput(e.target.value)}
-                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
+                    className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-center"
                     placeholder="days"
                     autoFocus
                   />
                   <button
                     onClick={handleGerminationSave}
                     disabled={updating}
-                    className="text-green-400 hover:text-green-300 text-xs"
+                    className="text-green-400 hover:text-green-300 px-3 py-2 bg-slate-700 rounded-lg"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setEditingGermination(false)}
-                    className="text-slate-400 hover:text-slate-300 text-xs"
+                    className="text-slate-400 hover:text-slate-300 px-2 py-2"
                   >
                     Cancel
                   </button>
@@ -450,7 +450,7 @@ export default function PlantDetailPage() {
               )}
             </dd>
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center py-3">
             <dt className="text-slate-400">Planting Depth</dt>
             <dd>
               {editingDepth ? (
@@ -461,20 +461,20 @@ export default function PlantDetailPage() {
                     step="0.25"
                     value={depthInput}
                     onChange={(e) => setDepthInput(e.target.value)}
-                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
-                    placeholder="inches"
+                    className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-center"
+                    placeholder="in"
                     autoFocus
                   />
                   <button
                     onClick={handleDepthSave}
                     disabled={updating}
-                    className="text-green-400 hover:text-green-300 text-xs"
+                    className="text-green-400 hover:text-green-300 px-3 py-2 bg-slate-700 rounded-lg"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setEditingDepth(false)}
-                    className="text-slate-400 hover:text-slate-300 text-xs"
+                    className="text-slate-400 hover:text-slate-300 px-2 py-2"
                   >
                     Cancel
                   </button>
@@ -492,7 +492,7 @@ export default function PlantDetailPage() {
               )}
             </dd>
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center py-3">
             <dt className="text-slate-400">Spacing</dt>
             <dd>
               {editingSpacing ? (
@@ -503,20 +503,20 @@ export default function PlantDetailPage() {
                     step="1"
                     value={spacingInput}
                     onChange={(e) => setSpacingInput(e.target.value)}
-                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
-                    placeholder="inches"
+                    className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-center"
+                    placeholder="in"
                     autoFocus
                   />
                   <button
                     onClick={handleSpacingSave}
                     disabled={updating}
-                    className="text-green-400 hover:text-green-300 text-xs"
+                    className="text-green-400 hover:text-green-300 px-3 py-2 bg-slate-700 rounded-lg"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setEditingSpacing(false)}
-                    className="text-slate-400 hover:text-slate-300 text-xs"
+                    className="text-slate-400 hover:text-slate-300 px-2 py-2"
                   >
                     Cancel
                   </button>
@@ -534,7 +534,7 @@ export default function PlantDetailPage() {
               )}
             </dd>
           </div>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center py-3">
             <dt className="text-slate-400">Height</dt>
             <dd>
               {editingHeight ? (
@@ -545,20 +545,20 @@ export default function PlantDetailPage() {
                     step="1"
                     value={heightInput}
                     onChange={(e) => setHeightInput(e.target.value)}
-                    className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-sm text-center"
-                    placeholder="inches"
+                    className="w-20 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-center"
+                    placeholder="in"
                     autoFocus
                   />
                   <button
                     onClick={handleHeightSave}
                     disabled={updating}
-                    className="text-green-400 hover:text-green-300 text-xs"
+                    className="text-green-400 hover:text-green-300 px-3 py-2 bg-slate-700 rounded-lg"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setEditingHeight(false)}
-                    className="text-slate-400 hover:text-slate-300 text-xs"
+                    className="text-slate-400 hover:text-slate-300 px-2 py-2"
                   >
                     Cancel
                   </button>
@@ -577,13 +577,13 @@ export default function PlantDetailPage() {
             </dd>
           </div>
           {plant.days_to_maturity && (
-            <div className="flex justify-between">
+            <div className="flex justify-between py-3">
               <dt className="text-slate-400">Days to Maturity</dt>
               <dd>{plant.days_to_maturity} days</dd>
             </div>
           )}
           {harvestDate && (
-            <div className="flex justify-between">
+            <div className="flex justify-between py-3">
               <dt className="text-slate-400">Est. Harvest Date</dt>
               <dd className="text-green-400">
                 {harvestDate.toLocaleDateString()}
@@ -591,11 +591,11 @@ export default function PlantDetailPage() {
             </div>
           )}
           {daysRemaining !== null && (
-            <div className="flex justify-between">
+            <div className="flex justify-between py-3">
               <dt className="text-slate-400">Days Remaining</dt>
               <dd
                 className={
-                  daysRemaining <= 7 ? "text-orange-400" : "text-slate-200"
+                  daysRemaining <= 7 ? "text-orange-400 font-semibold" : "text-slate-200"
                 }
               >
                 {daysRemaining > 0 ? `${daysRemaining} days` : "Ready!"}
