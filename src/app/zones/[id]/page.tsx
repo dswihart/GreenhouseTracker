@@ -75,7 +75,7 @@ export default function ZoneDetailPage() {
     const updateDimensions = () => {
       setDimensions({
         width: Math.min(window.innerWidth - 32, 1200),
-        height: Math.min(window.innerHeight - 280, 600),
+        height: Math.min(window.innerHeight - 200, 900),
       });
     };
 

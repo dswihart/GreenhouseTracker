@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { useZoneStore } from "@/store/zoneStore";
 import { supabase } from "@/lib/supabase/client";
-import type { ZoneType } from "@/lib/supabase/types";
+import type { ZoneType, Tray } from "@/lib/supabase/types";
 
 const zoneTypeConfig: Record<ZoneType, { icon: string; label: string; color: string; bgColor: string }> = {
   greenhouse: {
@@ -25,7 +25,7 @@ const zoneTypeConfig: Record<ZoneType, { icon: string; label: string; color: str
 
 export default function ZonesPage() {
   const { user } = useAuthStore();
-  const { zones, setZones, addZone, zoneItems, setZoneItems } = useZoneStore();
+  const { zones, setZones, addZone, zoneItems, setZoneItems, trays, setTrays } = useZoneStore();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +43,16 @@ export default function ZonesPage() {
         setZones(zonesData);
       }
 
+      // Load trays
+      const { data: traysData } = await supabase
+        .from("trays")
+        .select("*")
+        .order("position", { ascending: true });
+
+      if (traysData) {
+        setTrays(traysData);
+      }
+
       const { data: itemsData } = await supabase.from("zone_items").select("*");
 
       if (itemsData) {
@@ -53,10 +63,24 @@ export default function ZonesPage() {
     };
 
     loadZones();
-  }, [user, setZones, setZoneItems]);
+  }, [user, setZones, setZoneItems, setTrays]);
 
   const getPlantCount = (zoneId: string) => {
     return zoneItems.filter((item) => item.zone_id === zoneId).length;
+  };
+
+  const getTrayCount = (zoneId: string) => {
+    return trays.filter((tray) => tray.zone_id === zoneId).length;
+  };
+
+  const getTotalSlots = (zoneId: string) => {
+    const zoneTrays = trays.filter((tray) => tray.zone_id === zoneId);
+    if (zoneTrays.length > 0) {
+      return zoneTrays.reduce((sum, tray) => sum + (tray.rows * tray.cols), 0);
+    }
+    // Fallback to zone grid_config for zones without trays
+    const zone = zones.find((z) => z.id === zoneId);
+    return zone ? zone.grid_config.cols * zone.grid_config.rows : 0;
   };
 
   if (!user) {
@@ -129,8 +153,9 @@ export default function ZonesPage() {
           {zones.map((zone) => {
             const config = zoneTypeConfig[zone.type];
             const plantCount = getPlantCount(zone.id);
-            const totalSlots = zone.grid_config.cols * zone.grid_config.rows;
-            const usagePercent = Math.round((plantCount / totalSlots) * 100);
+            const trayCount = getTrayCount(zone.id);
+            const totalSlots = getTotalSlots(zone.id);
+            const usagePercent = totalSlots > 0 ? Math.round((plantCount / totalSlots) * 100) : 0;
 
             return (
               <Link
@@ -150,11 +175,11 @@ export default function ZonesPage() {
                   </div>
                 </div>
 
-                {/* Grid Info */}
+                {/* Zone Info */}
                 <div className="mb-4 p-3 bg-slate-800/50 rounded-xl">
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-slate-400">Grid Size</span>
-                    <span className="font-medium">{zone.grid_config.cols} × {zone.grid_config.rows}</span>
+                    <span className="text-slate-400">Trays</span>
+                    <span className="font-medium">{trayCount || 1}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-400">Total Slots</span>
@@ -190,8 +215,23 @@ export default function ZonesPage() {
       {showCreateForm && (
         <CreateZoneModal
           onClose={() => setShowCreateForm(false)}
-          onCreated={(zone) => {
+          onCreated={async (zone) => {
             addZone(zone);
+            // Auto-create a default tray for the new zone
+            const { data: newTray } = await supabase
+              .from("trays")
+              .insert({
+                zone_id: zone.id,
+                name: "Main Tray",
+                rows: zone.grid_config.rows,
+                cols: zone.grid_config.cols,
+                position: 0,
+              })
+              .select()
+              .single();
+            if (newTray) {
+              setTrays([...trays, newTray]);
+            }
             setShowCreateForm(false);
           }}
         />
@@ -211,8 +251,8 @@ function CreateZoneModal({
   const [formData, setFormData] = useState({
     name: "",
     type: "greenhouse" as ZoneType,
-    rows: 6,
-    cols: 4,
+    rows: 4,
+    cols: 6,
   });
   const [loading, setLoading] = useState(false);
 
@@ -293,30 +333,31 @@ function CreateZoneModal({
           </div>
 
           <div>
-            <label className="block text-lg font-medium mb-3">Grid Size</label>
+            <label className="block text-lg font-medium mb-3">First Tray Size</label>
+            <p className="text-sm text-slate-400 mb-3">You can add more trays later with different sizes.</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Columns (width)</label>
+                <label className="block text-sm text-slate-400 mb-1">Columns</label>
                 <input
                   type="number"
                   min="2"
-                  max="12"
+                  max="20"
                   value={formData.cols}
                   onChange={(e) =>
-                    setFormData({ ...formData, cols: parseInt(e.target.value) || 4 })
+                    setFormData({ ...formData, cols: parseInt(e.target.value) || 6 })
                   }
                   className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Rows (height)</label>
+                <label className="block text-sm text-slate-400 mb-1">Rows</label>
                 <input
                   type="number"
                   min="2"
-                  max="12"
+                  max="20"
                   value={formData.rows}
                   onChange={(e) =>
-                    setFormData({ ...formData, rows: parseInt(e.target.value) || 6 })
+                    setFormData({ ...formData, rows: parseInt(e.target.value) || 4 })
                   }
                   className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
                 />

@@ -21,7 +21,6 @@ interface ZoneCanvasProps {
   onTransplant?: (plantId: string) => void;
   onPlantClick?: (plantId: string) => void;
   onMoveToTray?: (itemId: string, trayId: string) => void;
-  highlightRow?: number | null;
   contacts?: Contact[];
 }
 
@@ -34,7 +33,6 @@ export function ZoneCanvas({
   onTransplant,
   onPlantClick,
   onMoveToTray,
-  highlightRow,
   contacts = [],
 }: ZoneCanvasProps) {
   const { updateZoneItem } = useZoneStore();
@@ -54,10 +52,23 @@ export function ZoneCanvas({
     ? { rows: tray.rows, cols: tray.cols }
     : zone.grid_config;
 
+  const cellUnit = CELL_SIZE + CELL_GAP;
+
+  // Calculate full canvas dimensions
+  const canvasWidth = gridConfig.cols * cellUnit;
+  const canvasHeight = gridConfig.rows * cellUnit;
+
+  // Scale to fit both width and height - show entire grid without scrolling
+  const scaleX = width / canvasWidth;
+  const scaleY = height / canvasHeight;
+  const scale = Math.min(scaleX, scaleY);
+
+  const scaledWidth = canvasWidth * scale;
+  const scaledHeight = canvasHeight * scale;
+
   const handleDragEnd = useCallback(
     async (itemId: string, e: KonvaEventObject<DragEvent>) => {
       const node = e.target;
-      const cellUnit = CELL_SIZE + CELL_GAP;
       const x = Math.round(node.x() / cellUnit);
       const y = Math.round(node.y() / cellUnit);
 
@@ -84,7 +95,7 @@ export function ZoneCanvas({
           .eq("id", itemId);
       }, 500);
     },
-    [gridConfig.cols, gridConfig.rows, updateZoneItem]
+    [gridConfig.cols, gridConfig.rows, updateZoneItem, cellUnit]
   );
 
   const getPlantName = (plantId: string) => {
@@ -98,13 +109,11 @@ export function ZoneCanvas({
   };
 
   const getPlantColor = (plantId: string, assignedTo: string | null) => {
-    // If assigned to a contact, use their color
     if (assignedTo) {
       const contact = contacts.find((c) => c.id === assignedTo);
       if (contact?.color) return contact.color;
     }
 
-    // Otherwise use stage-based color
     const plant = plants.find((p) => p.id === plantId);
     if (!plant) return "#64748b";
 
@@ -159,29 +168,18 @@ export function ZoneCanvas({
   };
 
   const zoneColors = getZoneColors(zone.type);
-  const cellUnit = CELL_SIZE + CELL_GAP;
-  const canvasWidth = gridConfig.cols * cellUnit;
 
-  // If filtering by row, only show that single row
-  const displayRows = highlightRow !== null ? 1 : gridConfig.rows;
-  const canvasHeight = displayRows * cellUnit;
-
-  // Calculate scale to fit within container
-  const scaleX = width / canvasWidth;
-  const scaleY = height / canvasHeight;
-  const scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down if needed
+  // Calculate scaled cell size for text
+  const scaledCellSize = CELL_SIZE * scale;
 
   const handleMouseEnter = (item: ZoneItem, e: KonvaEventObject<MouseEvent>) => {
     const plant = plants.find((p) => p.id === item.plant_id);
     if (!plant) return;
 
-    // Get the cell position and calculate tooltip position
-    const displayY = highlightRow !== null ? 0 : item.y;
     const cellX = item.x * cellUnit * scale;
-    const cellY = displayY * cellUnit * scale;
+    const cellY = item.y * cellUnit * scale;
 
-    // Position tooltip to the right of the cell, or left if near edge
-    const tooltipX = cellX + (CELL_SIZE * scale) + 10;
+    const tooltipX = cellX + scaledCellSize + 10;
     const tooltipY = cellY;
 
     setTooltip({
@@ -200,29 +198,26 @@ export function ZoneCanvas({
   return (
     <div
       ref={containerRef}
-      className="overflow-auto relative"
+      className="relative rounded-xl flex items-center justify-center"
       style={{
-        maxWidth: width,
-        maxHeight: height,
+        width: width,
+        height: scaledHeight + 20,
         backgroundColor: zoneColors.bg,
-        touchAction: "pan-y",
+        padding: "10px",
       }}
     >
       <Stage
-        width={canvasWidth * scale}
-        height={canvasHeight * scale}
+        width={scaledWidth}
+        height={scaledHeight}
         scaleX={scale}
         scaleY={scale}
-        style={{ touchAction: "pan-y" }}
       >
         {/* Grid Layer */}
         <Layer>
-          {Array.from({ length: displayRows }).map((_, rowIndex) => {
-            // When filtering, rowIndex is 0 but we show the highlighted row
-            const actualRow = highlightRow !== null ? highlightRow : rowIndex;
-            return Array.from({ length: gridConfig.cols }).map((_, col) => (
+          {Array.from({ length: gridConfig.rows }).map((_, rowIndex) =>
+            Array.from({ length: gridConfig.cols }).map((_, col) => (
               <Rect
-                key={`${actualRow}-${col}`}
+                key={`${rowIndex}-${col}`}
                 x={col * cellUnit}
                 y={rowIndex * cellUnit}
                 width={CELL_SIZE}
@@ -232,8 +227,8 @@ export function ZoneCanvas({
                 stroke={zoneColors.border}
                 strokeWidth={2}
               />
-            ));
-          })}
+            ))
+          )}
         </Layer>
 
         {/* Plants Layer */}
@@ -245,15 +240,12 @@ export function ZoneCanvas({
               ? plantName.substring(0, 9) + "..."
               : plantName;
 
-            // When filtering by row, position all items at y=0 (single row view)
-            const displayY = highlightRow !== null ? 0 : item.y;
-
             return (
               <Group
                 key={item.id}
                 x={item.x * cellUnit}
-                y={displayY * cellUnit}
-                draggable={highlightRow === null}
+                y={item.y * cellUnit}
+                draggable
                 onDragEnd={(e) => handleDragEnd(item.id, e)}
                 onClick={() => onPlantClick?.(item.plant_id)}
                 onTap={() => onPlantClick?.(item.plant_id)}
@@ -343,7 +335,6 @@ export function ZoneCanvas({
                 {formatStage(tooltip.plant.current_stage)}
               </span>
             </div>
-            {/* Assigned To */}
             <div className="flex items-center gap-2 text-sm mb-2">
               <span className="text-slate-400">Assigned:</span>
               {assignedContact ? (
