@@ -6,30 +6,34 @@ import type { KonvaEventObject } from "konva/lib/Node";
 import { useZoneStore } from "@/store/zoneStore";
 import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
-import type { Zone, ZoneItem, ZoneType, Plant, Contact } from "@/lib/supabase/types";
+import type { Zone, ZoneItem, ZoneType, Plant, Contact, Tray } from "@/lib/supabase/types";
 
-// Larger cells for senior accessibility (minimum 60px touch target)
-const CELL_SIZE = 70;
-const CELL_GAP = 4;
+// Larger cells for better visibility (100px as requested)
+const CELL_SIZE = 100;
+const CELL_GAP = 6;
 
 interface ZoneCanvasProps {
   zone: Zone;
+  tray?: Tray | null;
   items: ZoneItem[];
   width: number;
   height: number;
   onTransplant?: (plantId: string) => void;
   onPlantClick?: (plantId: string) => void;
+  onMoveToTray?: (itemId: string, trayId: string) => void;
   highlightRow?: number | null;
   contacts?: Contact[];
 }
 
 export function ZoneCanvas({
   zone,
+  tray,
   items,
   width,
   height,
   onTransplant,
   onPlantClick,
+  onMoveToTray,
   highlightRow,
   contacts = [],
 }: ZoneCanvasProps) {
@@ -45,6 +49,11 @@ export function ZoneCanvas({
     item: ZoneItem | null;
   }>({ visible: false, x: 0, y: 0, plant: null, item: null });
 
+  // Use tray config if available, otherwise fall back to zone config
+  const gridConfig = tray
+    ? { rows: tray.rows, cols: tray.cols }
+    : zone.grid_config;
+
   const handleDragEnd = useCallback(
     async (itemId: string, e: KonvaEventObject<DragEvent>) => {
       const node = e.target;
@@ -53,8 +62,8 @@ export function ZoneCanvas({
       const y = Math.round(node.y() / cellUnit);
 
       // Clamp to grid bounds
-      const clampedX = Math.max(0, Math.min(x, zone.grid_config.cols - 1));
-      const clampedY = Math.max(0, Math.min(y, zone.grid_config.rows - 1));
+      const clampedX = Math.max(0, Math.min(x, gridConfig.cols - 1));
+      const clampedY = Math.max(0, Math.min(y, gridConfig.rows - 1));
 
       // Snap to grid
       node.x(clampedX * cellUnit);
@@ -75,7 +84,7 @@ export function ZoneCanvas({
           .eq("id", itemId);
       }, 500);
     },
-    [zone.grid_config.cols, zone.grid_config.rows, updateZoneItem]
+    [gridConfig.cols, gridConfig.rows, updateZoneItem]
   );
 
   const getPlantName = (plantId: string) => {
@@ -118,17 +127,17 @@ export function ZoneCanvas({
   const getStageIcon = (stage: string) => {
     switch (stage) {
       case "seed":
-        return "🌰";
+        return "seed";
       case "seedling":
-        return "🌱";
+        return "seedling";
       case "vegetative":
-        return "🌿";
+        return "veg";
       case "flowering":
-        return "🌸";
+        return "flower";
       case "harvest_ready":
-        return "🥕";
+        return "ready";
       default:
-        return "🌱";
+        return "plant";
     }
   };
 
@@ -151,14 +160,13 @@ export function ZoneCanvas({
 
   const zoneColors = getZoneColors(zone.type);
   const cellUnit = CELL_SIZE + CELL_GAP;
-  const canvasWidth = zone.grid_config.cols * cellUnit;
+  const canvasWidth = gridConfig.cols * cellUnit;
 
   // If filtering by row, only show that single row
-  const displayRows = highlightRow !== null ? 1 : zone.grid_config.rows;
+  const displayRows = highlightRow !== null ? 1 : gridConfig.rows;
   const canvasHeight = displayRows * cellUnit;
 
   // Calculate scale to fit within container
-  // Don't scale up for single row - keep original size for readability
   const scaleX = width / canvasWidth;
   const scaleY = height / canvasHeight;
   const scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down if needed
@@ -212,7 +220,7 @@ export function ZoneCanvas({
           {Array.from({ length: displayRows }).map((_, rowIndex) => {
             // When filtering, rowIndex is 0 but we show the highlighted row
             const actualRow = highlightRow !== null ? highlightRow : rowIndex;
-            return Array.from({ length: zone.grid_config.cols }).map((_, col) => (
+            return Array.from({ length: gridConfig.cols }).map((_, col) => (
               <Rect
                 key={`${actualRow}-${col}`}
                 x={col * cellUnit}
@@ -220,7 +228,7 @@ export function ZoneCanvas({
                 width={CELL_SIZE}
                 height={CELL_SIZE}
                 fill={zoneColors.cell}
-                cornerRadius={8}
+                cornerRadius={12}
                 stroke={zoneColors.border}
                 strokeWidth={2}
               />
@@ -233,8 +241,8 @@ export function ZoneCanvas({
           {items.map((item) => {
             const plantName = getPlantName(item.plant_id);
             const plantStage = getPlantStage(item.plant_id);
-            const displayName = plantName.length > 8
-              ? plantName.substring(0, 7) + "…"
+            const displayName = plantName.length > 10
+              ? plantName.substring(0, 9) + "..."
               : plantName;
 
             // When filtering by row, position all items at y=0 (single row view)
@@ -259,35 +267,47 @@ export function ZoneCanvas({
                   width={CELL_SIZE}
                   height={CELL_SIZE}
                   fill={getPlantColor(item.plant_id, item.assigned_to)}
-                  cornerRadius={10}
+                  cornerRadius={12}
                   shadowColor="black"
-                  shadowBlur={6}
+                  shadowBlur={8}
                   shadowOpacity={0.4}
-                  shadowOffsetY={2}
+                  shadowOffsetY={3}
                 />
 
                 {/* Stage Indicator Bar */}
                 <Rect
-                  y={CELL_SIZE - 8}
+                  y={CELL_SIZE - 12}
                   width={CELL_SIZE}
-                  height={8}
+                  height={12}
                   fill="rgba(0,0,0,0.3)"
-                  cornerRadius={[0, 0, 10, 10]}
+                  cornerRadius={[0, 0, 12, 12]}
+                />
+
+                {/* Stage Text */}
+                <Text
+                  text={getStageIcon(plantStage)}
+                  fontSize={10}
+                  fill="rgba(255,255,255,0.8)"
+                  width={CELL_SIZE}
+                  y={CELL_SIZE - 11}
+                  height={10}
+                  align="center"
+                  fontStyle="bold"
                 />
 
                 {/* Plant Name */}
                 <Text
                   text={displayName}
-                  fontSize={11}
+                  fontSize={14}
                   fill="white"
                   width={CELL_SIZE}
-                  height={CELL_SIZE - 12}
+                  height={CELL_SIZE - 16}
                   align="center"
                   verticalAlign="middle"
                   fontStyle="bold"
                   shadowColor="black"
-                  shadowBlur={2}
-                  shadowOpacity={0.5}
+                  shadowBlur={3}
+                  shadowOpacity={0.6}
                 />
               </Group>
             );
@@ -302,15 +322,15 @@ export function ZoneCanvas({
           : null;
         return (
           <div
-            className="absolute pointer-events-none z-50 bg-slate-900/95 border border-slate-500 rounded-xl p-3 shadow-2xl backdrop-blur-sm"
+            className="absolute pointer-events-none z-50 bg-slate-900/95 border border-slate-500 rounded-xl p-4 shadow-2xl backdrop-blur-sm"
             style={{
               left: `${tooltip.x}px`,
               top: `${tooltip.y}px`,
-              minWidth: "160px",
-              maxWidth: "220px",
+              minWidth: "180px",
+              maxWidth: "240px",
             }}
           >
-            <div className="font-bold text-white text-base mb-1">
+            <div className="font-bold text-white text-lg mb-1">
               {tooltip.plant.name}
             </div>
             {tooltip.plant.species && (
@@ -319,7 +339,6 @@ export function ZoneCanvas({
               </div>
             )}
             <div className="flex items-center gap-2 text-sm mb-2">
-              <span className="text-lg">{getStageIcon(tooltip.plant.current_stage)}</span>
               <span className="text-slate-200 font-medium">
                 {formatStage(tooltip.plant.current_stage)}
               </span>

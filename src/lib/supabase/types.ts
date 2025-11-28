@@ -99,11 +99,39 @@ export interface Database {
           grid_config?: { rows: number; cols: number };
         };
       };
+      trays: {
+        Row: {
+          id: string;
+          zone_id: string;
+          name: string;
+          rows: number;
+          cols: number;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          zone_id: string;
+          name: string;
+          rows?: number;
+          cols?: number;
+          position?: number;
+        };
+        Update: {
+          id?: string;
+          zone_id?: string;
+          name?: string;
+          rows?: number;
+          cols?: number;
+          position?: number;
+        };
+      };
       zone_items: {
         Row: {
           id: string;
           zone_id: string;
           plant_id: string;
+          tray_id: string | null;
           x: number;
           y: number;
           assigned_to: string | null;
@@ -112,6 +140,7 @@ export interface Database {
           id?: string;
           zone_id: string;
           plant_id: string;
+          tray_id?: string | null;
           x: number;
           y: number;
           assigned_to?: string | null;
@@ -120,6 +149,7 @@ export interface Database {
           id?: string;
           zone_id?: string;
           plant_id?: string;
+          tray_id?: string | null;
           x?: number;
           y?: number;
           assigned_to?: string | null;
@@ -220,8 +250,18 @@ export interface Database {
 export type Plant = Database["public"]["Tables"]["plants"]["Row"];
 export type PlantInsert = Database["public"]["Tables"]["plants"]["Insert"];
 export type Zone = Database["public"]["Tables"]["zones"]["Row"];
+export type Tray = Database["public"]["Tables"]["trays"]["Row"];
+export type TrayInsert = Database["public"]["Tables"]["trays"]["Insert"];
 export type ZoneItem = Database["public"]["Tables"]["zone_items"]["Row"];
 export type MapLayout = Database["public"]["Tables"]["map_layout"]["Row"];
 export type JournalEntry = Database["public"]["Tables"]["journal_entries"]["Row"];
 export type CareSchedule = Database["public"]["Tables"]["care_schedules"]["Row"];
 export type Contact = Database["public"]["Tables"]["contacts"]["Row"];
+
+// Helper type for Profile with first_name and last_name
+export interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  settings: Record<string, unknown> | null;
+}
