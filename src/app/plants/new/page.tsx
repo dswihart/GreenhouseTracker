@@ -36,18 +36,32 @@ export default function NewPlantPage() {
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [urlLookupLoading, setUrlLookupLoading] = useState(false);
   const [error, setError] = useState("");
   const [scanSuccess, setScanSuccess] = useState("");
   const [manualBarcode, setManualBarcode] = useState("");
+  const [urlInput, setUrlInput] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [growingInfo, setGrowingInfo] = useState<{
     description?: string | null;
     plantingDepth?: string | null;
     spacing?: string | null;
+    rowSpacing?: string | null;
     sunRequirements?: string | null;
     wateringNeeds?: string | null;
+    soilRequirements?: string | null;
+    sowingInstructions?: string | null;
+    transplantInfo?: string | null;
     harvestInfo?: string | null;
+    height?: string | null;
+    spread?: string | null;
     growingTips?: string | null;
+    daysToGermination?: string | null;
+    seedCount?: string | null;
+    isHybrid?: boolean | null;
+    isHeirloom?: boolean | null;
+    isOrganic?: boolean | null;
+    resistances?: string | null;
     imageUrl?: string | null;
   } | null>(null);
 
@@ -107,6 +121,66 @@ export default function NewPlantPage() {
       setError("Failed to lookup barcode. Please enter details manually.");
     } finally {
       setLookupLoading(false);
+    }
+  };
+
+  const handleUrlImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput.trim()) return;
+
+    setUrlLookupLoading(true);
+    setError("");
+    setScanSuccess("");
+    setGrowingInfo(null);
+
+    try {
+      const response = await fetch(`/api/url-import?url=${encodeURIComponent(urlInput.trim())}`);
+      const data = await response.json();
+
+      if (data.found) {
+        setFormData((prev) => ({
+          ...prev,
+          name: data.name || prev.name,
+          species: data.species || data.variety || prev.species,
+          description: data.description || prev.description,
+          photo_url: data.imageUrl || prev.photo_url,
+          category: data.category || prev.category,
+          days_to_maturity: data.daysToMaturity?.toString() || prev.days_to_maturity,
+        }));
+
+        // Store ALL growing information
+        setGrowingInfo({
+          description: data.description,
+          plantingDepth: data.plantingDepth,
+          spacing: data.spacing,
+          rowSpacing: data.rowSpacing,
+          sunRequirements: data.sunRequirements,
+          wateringNeeds: data.wateringNeeds,
+          soilRequirements: data.soilRequirements,
+          sowingInstructions: data.sowingInstructions,
+          transplantInfo: data.transplantInfo,
+          harvestInfo: data.harvestInfo,
+          height: data.height,
+          spread: data.spread,
+          growingTips: data.growingTips,
+          daysToGermination: data.daysToGermination,
+          seedCount: data.seedCount,
+          isHybrid: data.isHybrid,
+          isHeirloom: data.isHeirloom,
+          isOrganic: data.isOrganic,
+          resistances: data.resistances,
+          imageUrl: data.imageUrl,
+        });
+
+        setScanSuccess(`Imported: ${data.name || "Plant"} from ${data.source} - Details filled in below!`);
+        setUrlInput("");
+      } else {
+        setError(data.error || "Could not extract plant details from this URL. Please enter details manually.");
+      }
+    } catch (err) {
+      setError("Failed to import from URL. Please check the URL and try again.");
+    } finally {
+      setUrlLookupLoading(false);
     }
   };
 
@@ -179,17 +253,17 @@ export default function NewPlantPage() {
         <button
           type="button"
           onClick={() => setScanning(true)}
-          disabled={lookupLoading}
+          disabled={lookupLoading || urlLookupLoading}
           className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-purple-800 disabled:to-indigo-800 text-white p-6 rounded-2xl font-bold text-xl shadow-lg shadow-purple-900/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-4"
         >
           {lookupLoading ? (
             <>
-              <span className="text-3xl animate-spin">⏳</span>
+              <span className="text-3xl animate-spin">&#8987;</span>
               <span>Looking up product...</span>
             </>
           ) : (
             <>
-              <span className="text-4xl">📷</span>
+              <span className="text-4xl">&#128247;</span>
               <div className="text-left">
                 <div>Scan Seed Packet Barcode</div>
                 <div className="text-sm font-normal text-purple-200">
@@ -199,6 +273,46 @@ export default function NewPlantPage() {
             </>
           )}
         </button>
+      </div>
+
+      {/* URL Import Section */}
+      <div className="mb-4 p-4 bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border border-cyan-600/40 rounded-2xl">
+        <form onSubmit={handleUrlImport}>
+          <label className="block text-sm font-medium text-cyan-300 mb-2 flex items-center gap-2">
+            <span className="text-xl">&#128279;</span>
+            Import from Seed Vendor URL
+          </label>
+          <div className="flex gap-3">
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://www.burpee.com/..."
+              className="flex-1 px-4 py-3 bg-slate-800 border-2 border-cyan-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-lg placeholder-slate-500"
+              disabled={urlLookupLoading || lookupLoading}
+            />
+            <button
+              type="submit"
+              disabled={urlLookupLoading || lookupLoading || !urlInput.trim()}
+              className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
+            >
+              {urlLookupLoading ? (
+                <>
+                  <span className="animate-spin">&#8987;</span>
+                  <span>...</span>
+                </>
+              ) : (
+                <>
+                  <span>&#128230;</span>
+                  <span>Import</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            Supports Burpee, Johnny's Seeds, Baker Creek, Seed Savers, Park Seed, and more
+          </p>
+        </form>
       </div>
 
       {/* Manual Barcode Entry */}
@@ -213,14 +327,14 @@ export default function NewPlantPage() {
             onChange={(e) => setManualBarcode(e.target.value)}
             placeholder="Enter barcode number..."
             className="flex-1 px-4 py-3 bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg"
-            disabled={lookupLoading}
+            disabled={lookupLoading || urlLookupLoading}
           />
           <button
             type="submit"
-            disabled={lookupLoading || !manualBarcode.trim()}
+            disabled={lookupLoading || urlLookupLoading || !manualBarcode.trim()}
             className="px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white rounded-xl font-bold transition-colors"
           >
-            🔍 Lookup
+            &#128269; Lookup
           </button>
         </div>
       </form>
@@ -235,7 +349,7 @@ export default function NewPlantPage() {
       {/* Success Message */}
       {scanSuccess && (
         <div className="mb-6 p-4 bg-green-900/30 border border-green-600/50 rounded-xl text-green-300 flex items-center gap-3">
-          <span className="text-2xl">✅</span>
+          <span className="text-2xl">&#9989;</span>
           <span>{scanSuccess}</span>
         </div>
       )}
@@ -254,68 +368,170 @@ export default function NewPlantPage() {
               <p className="text-xs text-slate-400 text-center mt-1">Reference: What it looks like when mature</p>
             </div>
           )}
+
+          {/* Variety Tags */}
+          {(growingInfo.isHybrid || growingInfo.isHeirloom || growingInfo.isOrganic) && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {growingInfo.isHybrid && (
+                <span className="px-3 py-1 bg-blue-600/30 border border-blue-500/50 rounded-full text-blue-300 text-sm font-medium">Hybrid (F1)</span>
+              )}
+              {growingInfo.isHeirloom && (
+                <span className="px-3 py-1 bg-amber-600/30 border border-amber-500/50 rounded-full text-amber-300 text-sm font-medium">Heirloom</span>
+              )}
+              {growingInfo.isOrganic && (
+                <span className="px-3 py-1 bg-green-600/30 border border-green-500/50 rounded-full text-green-300 text-sm font-medium">Organic</span>
+              )}
+            </div>
+          )}
+
           {/* Description */}
           {growingInfo.description && (
             <div className="mb-4 p-3 bg-slate-800/50 rounded-xl">
               <p className="text-slate-200">{growingInfo.description}</p>
             </div>
           )}
+
           <h3 className="text-lg font-bold text-emerald-300 mb-4 flex items-center gap-2">
-            <span className="text-2xl">🌱</span>
+            <span className="text-2xl">&#127793;</span>
             Growing Information
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {growingInfo.sunRequirements && (
               <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
-                <span className="text-2xl">☀️</span>
+                <span className="text-xl">&#9728;&#65039;</span>
                 <div>
-                  <div className="text-sm text-slate-400">Sun</div>
-                  <div className="text-white font-medium">{growingInfo.sunRequirements}</div>
+                  <div className="text-xs text-slate-400">Sun</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.sunRequirements}</div>
                 </div>
               </div>
             )}
             {growingInfo.wateringNeeds && (
               <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
-                <span className="text-2xl">💧</span>
+                <span className="text-xl">&#128167;</span>
                 <div>
-                  <div className="text-sm text-slate-400">Water</div>
-                  <div className="text-white font-medium">{growingInfo.wateringNeeds}</div>
+                  <div className="text-xs text-slate-400">Water</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.wateringNeeds}</div>
                 </div>
               </div>
             )}
             {growingInfo.plantingDepth && (
               <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
-                <span className="text-2xl">📏</span>
+                <span className="text-xl">&#128207;</span>
                 <div>
-                  <div className="text-sm text-slate-400">Planting Depth</div>
-                  <div className="text-white font-medium">{growingInfo.plantingDepth}</div>
+                  <div className="text-xs text-slate-400">Planting Depth</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.plantingDepth}</div>
                 </div>
               </div>
             )}
             {growingInfo.spacing && (
               <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
-                <span className="text-2xl">↔️</span>
+                <span className="text-xl">&#8596;&#65039;</span>
                 <div>
-                  <div className="text-sm text-slate-400">Spacing</div>
-                  <div className="text-white font-medium">{growingInfo.spacing}</div>
+                  <div className="text-xs text-slate-400">Plant Spacing</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.spacing}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.rowSpacing && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#8649;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Row Spacing</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.rowSpacing}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.height && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#8597;&#65039;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Height</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.height}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.spread && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#10231;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Spread</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.spread}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.daysToGermination && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#127807;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Germination</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.daysToGermination}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.soilRequirements && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#129683;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Soil</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.soilRequirements}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.seedCount && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#128230;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Seeds in Packet</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.seedCount}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Full-width info sections */}
+          <div className="mt-3 space-y-3">
+            {growingInfo.sowingInstructions && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#128197;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Sowing Instructions</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.sowingInstructions}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.transplantInfo && (
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#127794;</span>
+                <div>
+                  <div className="text-xs text-slate-400">Transplanting</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.transplantInfo}</div>
                 </div>
               </div>
             )}
             {growingInfo.harvestInfo && (
-              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl col-span-full">
-                <span className="text-2xl">🥬</span>
+              <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-xl">
+                <span className="text-xl">&#129388;</span>
                 <div>
-                  <div className="text-sm text-slate-400">Harvest</div>
-                  <div className="text-white font-medium">{growingInfo.harvestInfo}</div>
+                  <div className="text-xs text-slate-400">Harvest</div>
+                  <div className="text-white font-medium text-sm">{growingInfo.harvestInfo}</div>
+                </div>
+              </div>
+            )}
+            {growingInfo.resistances && (
+              <div className="flex items-start gap-3 p-3 bg-green-900/30 border border-green-600/30 rounded-xl">
+                <span className="text-xl">&#128170;</span>
+                <div>
+                  <div className="text-xs text-green-400">Disease Resistance</div>
+                  <div className="text-green-100 text-sm">{growingInfo.resistances}</div>
                 </div>
               </div>
             )}
             {growingInfo.growingTips && (
-              <div className="flex items-start gap-3 p-3 bg-amber-900/30 border border-amber-600/30 rounded-xl col-span-full">
-                <span className="text-2xl">💡</span>
+              <div className="flex items-start gap-3 p-3 bg-amber-900/30 border border-amber-600/30 rounded-xl">
+                <span className="text-xl">&#128161;</span>
                 <div>
-                  <div className="text-sm text-amber-400">Growing Tips</div>
-                  <div className="text-amber-100">{growingInfo.growingTips}</div>
+                  <div className="text-xs text-amber-400">Growing Tips</div>
+                  <div className="text-amber-100 text-sm">{growingInfo.growingTips}</div>
                 </div>
               </div>
             )}
@@ -326,7 +542,7 @@ export default function NewPlantPage() {
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-900/30 border border-red-600/50 rounded-xl text-red-300 flex items-center gap-3">
-          <span className="text-2xl">⚠️</span>
+          <span className="text-2xl">&#9888;&#65039;</span>
           <span>{error}</span>
         </div>
       )}
