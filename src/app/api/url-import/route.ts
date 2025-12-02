@@ -1,3 +1,6 @@
+// Extend API route timeout
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -411,7 +414,7 @@ export async function GET(request: NextRequest) {
           "Accept-Language": "en-US,en;q=0.9",
           "Cache-Control": "no-cache",
         },
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (directResponse.ok) {
@@ -437,7 +440,7 @@ export async function GET(request: NextRequest) {
         try {
           const scraperResponse = await fetch(
             `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=true&country_code=us&premium=true`,
-            { signal: AbortSignal.timeout(60000) }
+            { signal: AbortSignal.timeout(45000) }
           );
 
           if (scraperResponse.ok) {
@@ -479,6 +482,11 @@ export async function GET(request: NextRequest) {
 
     // Extract plant data using AI
     const plantData = await extractPlantDataWithAI(cleanedContent, url, vendorName);
+
+    // Clear imageUrl for AI knowledge fallback - AI hallucinates URLs
+    if (fetchMethod === "ai-knowledge") {
+      plantData.imageUrl = null;
+    }
 
     return NextResponse.json(plantData);
 

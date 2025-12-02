@@ -64,7 +64,6 @@ export default function PlantDetailPage() {
   const [zoneItem, setZoneItem] = useState<ZoneItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [showAssignMenu, setShowAssignMenu] = useState(false);
   const [editingGermination, setEditingGermination] = useState(false);
   const [germinationInput, setGerminationInput] = useState("");
   const [editingHeight, setEditingHeight] = useState(false);
@@ -168,28 +167,6 @@ export default function PlantDetailPage() {
     setUpdating(false);
   };
 
-  const handleAssignContact = async (contactId: string | null) => {
-    if (!plant) return;
-    setUpdating(true);
-
-    const { error } = await supabase
-      .from("plants")
-      .update({ assigned_to: contactId })
-      .eq("id", plant.id);
-
-    if (!error) {
-      setPlant({ ...plant, assigned_to: contactId });
-      updatePlant(plant.id, { assigned_to: contactId });
-    }
-
-    setUpdating(false);
-    setShowAssignMenu(false);
-  };
-
-  const getAssignedContact = () => {
-    if (!plant?.assigned_to) return null;
-    return contacts.find((c) => c.id === plant.assigned_to);
-  };
 
   const handleGerminationSave = async () => {
     if (!plant) return;
@@ -651,70 +628,6 @@ export default function PlantDetailPage() {
         </dl>
       </section>
 
-      {/* Assigned To */}
-      <section className="bg-slate-800 rounded-lg p-4 mb-6">
-        <h3 className="font-semibold mb-3">Assigned To</h3>
-        <div className="relative">
-          <button
-            onClick={() => setShowAssignMenu(!showAssignMenu)}
-            disabled={updating}
-            className="w-full flex items-center justify-between px-3 py-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
-          >
-            {getAssignedContact() ? (
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ backgroundColor: getAssignedContact()?.color || "#22c55e" }}
-                >
-                  {getAssignedContact()?.name.charAt(0).toUpperCase()}
-                </div>
-                <span>{getAssignedContact()?.name}</span>
-              </div>
-            ) : (
-              <span className="text-slate-400">Not assigned</span>
-            )}
-            <svg
-              className={`w-4 h-4 transition-transform ${showAssignMenu ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {showAssignMenu && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-700 rounded-lg shadow-lg z-10 overflow-hidden">
-              <button
-                onClick={() => handleAssignContact(null)}
-                className="w-full px-3 py-2 text-left hover:bg-slate-600 transition-colors flex items-center gap-2"
-              >
-                <div className="w-6 h-6 rounded-full bg-slate-500 flex items-center justify-center text-white text-xs">
-                  —
-                </div>
-                <span className="text-slate-400">Unassigned</span>
-              </button>
-              {contacts.map((contact) => (
-                <button
-                  key={contact.id}
-                  onClick={() => handleAssignContact(contact.id)}
-                  className={`w-full px-3 py-2 text-left hover:bg-slate-600 transition-colors flex items-center gap-2 ${
-                    plant?.assigned_to === contact.id ? "bg-slate-600" : ""
-                  }`}
-                >
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                    style={{ backgroundColor: contact.color }}
-                  >
-                    {contact.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span>{contact.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Actions */}
       <section className="grid grid-cols-2 gap-4 mb-6">

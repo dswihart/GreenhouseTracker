@@ -10,6 +10,7 @@ import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
 import { TransplantModal } from "@/components/TransplantModal";
 import type { Zone, ZoneItem, ZoneType, Contact, Tray } from "@/lib/supabase/types";
+import { AddPlantFlow } from "@/components/AddPlantFlow";
 
 const ZoneCanvas = dynamic(
   () => import("@/components/ZoneCanvas").then((mod) => mod.ZoneCanvas),
@@ -61,6 +62,7 @@ export default function ZoneDetailPage() {
   const [loading, setLoading] = useState(true);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [showTransplantModal, setShowTransplantModal] = useState(false);
+  const [showAddPlantFlow, setShowAddPlantFlow] = useState(false);
   const [showTrayModal, setShowTrayModal] = useState(false);
   const [editingTray, setEditingTray] = useState<Tray | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -225,6 +227,7 @@ export default function ZoneDetailPage() {
     alert("No empty cells available in this tray!");
   };
 
+  const handleAddToZoneAtPosition = async (plantId: string, x: number, y: number, contactId: string | null) => {    if (!zone || !activeTray) return;    const today = new Date().toISOString().split("T")[0];    await supabase.from("plants").update({ date_planted: today }).eq("id", plantId);    const updatedPlants = plants.map((p) => p.id === plantId ? { ...p, date_planted: today } : p);    setPlants(updatedPlants);    const { data, error } = await supabase.from("zone_items").insert({ zone_id: zoneId, plant_id: plantId, tray_id: activeTray.id, x, y, assigned_to: contactId }).select().single();    if (data && !error) { addZoneItem(data); }  };
   const handleRemoveFromZone = async (itemId: string) => {
     await supabase.from("zone_items").delete().eq("id", itemId);
     removeZoneItem(itemId);
@@ -675,59 +678,6 @@ export default function ZoneDetailPage() {
               />
             )}
           </div>
-
-          {/* Drag to Assign */}
-          {contacts.length > 0 && (
-            <div className="px-4 pb-2">
-              <div className="text-xs text-slate-500 mb-2">Drag plant here to assign:</div>
-              <div className="flex flex-wrap gap-2">
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setDragOverContact("none"); }}
-                  onDragLeave={() => setDragOverContact(null)}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    const itemId = e.dataTransfer.getData("itemId");
-                    if (itemId) await handleAssignContact(itemId, null);
-                    setDragOverContact(null);
-                  }}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    dragOverContact === "none" ? "bg-slate-500 ring-2 ring-white" : "bg-slate-700"
-                  }`}
-                >
-                  Unassigned
-                </div>
-                {contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    onDragOver={(e) => { e.preventDefault(); setDragOverContact(contact.id); }}
-                    onDragLeave={() => setDragOverContact(null)}
-                    onDrop={async (e) => {
-                      e.preventDefault();
-                      const itemId = e.dataTransfer.getData("itemId");
-                      if (itemId) await handleAssignContact(itemId, contact.id);
-                      setDragOverContact(null);
-                    }}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      dragOverContact === contact.id ? "ring-2 ring-white" : ""
-                    }`}
-                    style={{ backgroundColor: contact.color }}
-                  >
-                    {contact.name}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Instructions */}
-          <div className="px-4 pb-4">
-            <div className="bg-slate-700/30 rounded-xl p-3 text-center text-sm text-slate-400">
-              <strong>Tap</strong> plant to assign • <strong>Drag</strong> to rearrange
-              {zoneTrays.length > 1 && (
-                <> • <strong>Drop on tab</strong> to move</>
-              )}
-            </div>
-          </div>
         </div>
       ) : (
         <div className="bg-slate-800 rounded-2xl p-8 text-center border-2 border-slate-700">
@@ -743,33 +693,31 @@ export default function ZoneDetailPage() {
         </div>
       )}
 
-      {/* Quick Add Plants */}
+      {/* Add Plant Button - Large and Easy to Tap */}
       <section className="mt-6">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <span className="text-2xl">➕</span> Add Unplaced Plants
-        </h3>
-        {unplacedPlants.length === 0 ? (
-          <div className="bg-slate-800/50 rounded-xl p-6 text-center border border-slate-700/50">
-            <p className="text-slate-400">All plants are placed.</p>
-            <Link href="/plants/new" className="text-green-400 hover:text-green-300 font-medium mt-2 inline-block">
-              Add a new plant →
-            </Link>
-          </div>
+        {unplacedPlants.length > 0 ? (
+          <button
+            onClick={() => setShowAddPlantFlow(true)}
+            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white p-6 rounded-2xl font-bold text-xl shadow-lg shadow-green-900/30 transition-all flex items-center justify-center gap-4"
+          >
+            <span className="text-4xl">➕</span>
+            <div className="text-left">
+              <div className="text-2xl">Add Plant to This Tray</div>
+              <div className="text-lg font-normal text-green-100 mt-1">
+                {unplacedPlants.length} plant{unplacedPlants.length !== 1 ? 's' : ''} ready to place
+              </div>
+            </div>
+          </button>
         ) : (
-          <div className="flex flex-wrap gap-3">
-            {unplacedPlants.slice(0, 10).map((plant) => (
-              <button
-                key={plant.id}
-                onClick={() => handleAddToZone(plant.id)}
-                className="bg-gradient-to-r from-slate-700 to-slate-600 hover:from-green-700 hover:to-green-600 px-5 py-3 rounded-xl text-base font-medium transition-all flex items-center gap-2 shadow"
-              >
-                <span className="text-xl">🌱</span>
-                {plant.name}
-              </button>
-            ))}
-            {unplacedPlants.length > 10 && (
-              <span className="px-4 py-3 text-slate-400">+{unplacedPlants.length - 10} more</span>
-            )}
+          <div className="bg-slate-800/50 rounded-2xl p-6 text-center border border-slate-700/50">
+            <div className="text-4xl mb-3">✓</div>
+            <p className="text-xl text-slate-300 mb-2">All plants are placed!</p>
+            <Link
+              href="/plants/new"
+              className="inline-block bg-green-600 hover:bg-green-500 text-white px-6 py-4 rounded-xl font-bold text-lg mt-2 transition-colors"
+            >
+              ➕ Add New Plant
+            </Link>
           </div>
         )}
       </section>
@@ -841,6 +789,7 @@ export default function ZoneDetailPage() {
           }}
         />
       )}
+      {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={unplacedPlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }}        />      )}
     </div>
   );
 }

@@ -12,84 +12,21 @@ export async function GET() {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Create contacts table
-    const { error: contactsError } = await supabase.rpc('exec_sql', {
+    const { error } = await supabase.rpc("exec_sql", {
       sql: `
-        CREATE TABLE IF NOT EXISTS contacts (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-          name TEXT NOT NULL,
-          phone TEXT,
-          email TEXT,
-          notes TEXT,
-          created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
-
-        DO $$ BEGIN
-          CREATE POLICY "Users can manage own contacts" ON contacts
-            FOR ALL USING (auth.uid() = user_id);
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END $$;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS description TEXT;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS photo_url TEXT;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS category TEXT;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS assigned_to UUID;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS germination_days INTEGER;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS height_inches NUMERIC;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS spacing_inches NUMERIC;
+        ALTER TABLE plants ADD COLUMN IF NOT EXISTS planting_depth_inches NUMERIC;
       `
     });
 
-    // Add contact_id to plants if it doesn't exist
-    const { error: plantsError } = await supabase.rpc('exec_sql', {
-      sql: `
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-      `
-    });
-
-    // Add growing info columns to plants
-    const { error: growingInfoError } = await supabase.rpc('exec_sql', {
-      sql: `
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN sun_requirements TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN watering_needs TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN soil_requirements TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN sowing_instructions TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN transplant_info TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN harvest_info TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN growing_tips TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN row_spacing TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN spread TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN seed_count TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_hybrid BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_heirloom BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_organic BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-        DO $$ BEGIN ALTER TABLE plants ADD COLUMN resistances TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
-      `
-    });
-
-    // Add first_name and last_name to profiles
-    const { error: profilesError } = await supabase.rpc('exec_sql', {
-      sql: `
-        DO $$ BEGIN
-          ALTER TABLE profiles ADD COLUMN first_name TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE profiles ADD COLUMN last_name TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-      `
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Database setup complete",
-      contactsError: contactsError?.message,
-      plantsError: plantsError?.message,
-      growingInfoError: growingInfoError?.message,
-      profilesError: profilesError?.message
-    });
+    return NextResponse.json({ success: true, error: error?.message || null });
   } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : "Setup failed"
-    }, { status: 500 });
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

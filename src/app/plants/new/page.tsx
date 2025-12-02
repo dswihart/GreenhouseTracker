@@ -191,7 +191,7 @@ export default function NewPlantPage() {
         });
 
         setScanSuccess(`Imported: ${data.name || "Plant"} from ${data.source} - Details filled in below!`);
-        setUrlInput("");
+        setUrlInput(""); // Keep growingInfo - only clear on new import
       } else {
         setError(data.error || "Could not extract plant details from this URL. Please enter details manually.");
       }
@@ -212,6 +212,50 @@ export default function NewPlantPage() {
     await handleBarcodeLookup(manualBarcode);
   };
 
+
+  const buildPlantDescription = () => {
+    const lines: string[] = [];
+
+    const addRawLine = (value?: string | null) => {
+      if (value === null || value === undefined) return;
+      const trimmed = String(value).trim();
+      if (trimmed) {
+        lines.push(trimmed);
+      }
+    };
+
+    const addLabeledLine = (label: string, value?: string | null) => {
+      if (value === null || value === undefined) return;
+      const trimmed = String(value).trim();
+      if (trimmed) {
+        lines.push(`${label}: ${trimmed}`);
+      }
+    };
+
+    addRawLine(formData.description);
+
+    if (growingInfo) {
+      addRawLine(growingInfo.description);
+      addLabeledLine("Sun", growingInfo.sunRequirements);
+      addLabeledLine("Water", growingInfo.wateringNeeds);
+      addLabeledLine("Soil", growingInfo.soilRequirements);
+      addLabeledLine("Planting Depth", growingInfo.plantingDepth);
+      addLabeledLine("Spacing", growingInfo.spacing);
+      addLabeledLine("Row Spacing", growingInfo.rowSpacing);
+      addLabeledLine("Height", growingInfo.height);
+      addLabeledLine("Spread", growingInfo.spread);
+      addLabeledLine("Germination", growingInfo.daysToGermination);
+      addLabeledLine("Sowing", growingInfo.sowingInstructions);
+      addLabeledLine("Transplant", growingInfo.transplantInfo);
+      addLabeledLine("Harvest", growingInfo.harvestInfo);
+      addLabeledLine("Seeds", growingInfo.seedCount);
+      addLabeledLine("Tips", growingInfo.growingTips);
+      addLabeledLine("Resistances", growingInfo.resistances);
+    }
+
+    return lines.join("\n");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -221,15 +265,28 @@ export default function NewPlantPage() {
 
     try {
       // Create array of plants to insert
+      const description = buildPlantDescription();
       const plantsToInsert = Array.from({ length: quantity }, (_, i) => ({
         user_id: user.id,
         name: quantity > 1 ? `${formData.name} #${i + 1}` : formData.name,
         species: formData.species || null,
-        description: formData.description || null,
+        description: description || null,
         photo_url: formData.photo_url || null,
         category: formData.category || null,
         days_to_maturity: formData.days_to_maturity
           ? parseInt(formData.days_to_maturity)
+          : null,
+        germination_days: formData.germination_days
+          ? parseInt(formData.germination_days)
+          : null,
+        height_inches: formData.height_inches
+          ? parseFloat(formData.height_inches)
+          : null,
+        spacing_inches: formData.spacing_inches
+          ? parseFloat(formData.spacing_inches)
+          : null,
+        planting_depth_inches: formData.planting_depth_inches
+          ? parseFloat(formData.planting_depth_inches)
           : null,
         current_stage: formData.current_stage,
       }));
@@ -359,8 +416,8 @@ export default function NewPlantPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setUrlInput("");
-                    setGrowingInfo(null);
+                    setUrlInput(""); // Keep growingInfo - only clear on new import
+                    
                     setError("");
                     setScanSuccess("");
                   }}
