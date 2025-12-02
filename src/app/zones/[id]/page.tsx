@@ -65,6 +65,7 @@ export default function ZoneDetailPage() {
   const [editingTray, setEditingTray] = useState<Tray | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dragOverTrayId, setDragOverTrayId] = useState<string | null>(null);
+  const [assigningItem, setAssigningItem] = useState<string | null>(null);
 
   const zoneId = params.id as string;
   const zone = zones.find((z) => z.id === zoneId);
@@ -73,9 +74,16 @@ export default function ZoneDetailPage() {
 
   useEffect(() => {
     const updateDimensions = () => {
+      const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+      const isMobile = window.innerWidth < 768;
+      
+      // Adjust padding and height for different devices
+      const sidePadding = isMobile ? 16 : isTablet ? 24 : 32;
+      const topOffset = isMobile ? 180 : isTablet ? 220 : 200;
+      
       setDimensions({
-        width: Math.min(window.innerWidth - 32, 1200),
-        height: Math.min(window.innerHeight - 200, 900),
+        width: Math.min(window.innerWidth - (sidePadding * 2), 1200),
+        height: Math.min(window.innerHeight - topOffset, isTablet ? 700 : 900),
       });
     };
 
@@ -263,6 +271,21 @@ export default function ZoneDetailPage() {
     }
     setShowTrayModal(false);
     setEditingTray(null);
+  };
+
+  const handleAssignContact = async (itemId: string, contactId: string | null) => {
+    const { error } = await supabase
+      .from("zone_items")
+      .update({ assigned_to: contactId })
+      .eq("id", itemId);
+    
+    if (!error) {
+      const updatedItems = zoneItems.map((item) =>
+        item.id === itemId ? { ...item, assigned_to: contactId } : item
+      );
+      setZoneItems(updatedItems);
+    }
+    setAssigningItem(null);
   };
 
   const handleDeleteTray = async (trayId: string) => {
@@ -494,12 +517,30 @@ export default function ZoneDetailPage() {
             )}
           </div>
 
+          {/* Contact Legend */}
+          {contacts.length > 0 && (
+            <div className="px-4 pb-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-slate-500">People:</span>
+                {contacts.map((contact) => (
+                  <span
+                    key={contact.id}
+                    className="px-2 py-1 rounded text-xs font-medium"
+                    style={{ backgroundColor: contact.color || "#22c55e" }}
+                  >
+                    {contact.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Instructions */}
           <div className="px-4 pb-4">
             <div className="bg-slate-700/30 rounded-xl p-3 text-center text-sm text-slate-400">
-              <strong>Drag</strong> plants to rearrange • <strong>Click</strong> to view details
+              <strong>Tap</strong> plant to assign • <strong>Drag</strong> to rearrange
               {zoneTrays.length > 1 && (
-                <> • <strong>Drop on tab</strong> to move between trays</>
+                <> • <strong>Drop on tab</strong> to move</>
               )}
             </div>
           </div>
@@ -638,10 +679,12 @@ function TrayModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    const validRows = Math.max(1, Math.min(20, rows || 4));
+    const validCols = Math.max(1, Math.min(20, cols || 6));
     if (tray) {
-      onUpdate(tray.id, name.trim(), rows, cols);
+      onUpdate(tray.id, name.trim(), validRows, validCols);
     } else {
-      onCreate(name.trim(), rows, cols);
+      onCreate(name.trim(), validRows, validCols);
     }
   };
 
@@ -676,7 +719,7 @@ function TrayModal({
                 min="1"
                 max="20"
                 value={cols}
-                onChange={(e) => setCols(parseInt(e.target.value) || 6)}
+                onChange={(e) => { const v = parseInt(e.target.value); setCols(isNaN(v) ? 6 : Math.max(1, Math.min(20, v))); }}
                 className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
               />
             </div>
@@ -687,7 +730,7 @@ function TrayModal({
                 min="1"
                 max="20"
                 value={rows}
-                onChange={(e) => setRows(parseInt(e.target.value) || 4)}
+                onChange={(e) => { const v = parseInt(e.target.value); setRows(isNaN(v) ? 4 : Math.max(1, Math.min(20, v))); }}
                 className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
               />
             </div>

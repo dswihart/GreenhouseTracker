@@ -73,3 +73,33 @@ h3 { font-size: 1.5rem !important; }
   font-weight: 600;
   border-radius: 12px;
 }
+
+/* iPad-specific fixes */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .zone-canvas-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Ensure tray tabs don't wrap oddly */
+  .tray-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+  }
+  
+  /* Ensure plants grid displays properly */
+  .plants-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px;
+  }
+}
+
+/* iPad landscape */
+@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape) {
+  .plants-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}

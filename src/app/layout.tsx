@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   title: "Greenhouse Tracker",
   description: "AI-powered greenhouse management - track plants, diagnose issues, schedule care",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: [
+      { url: "/icons/icon-192.png", sizes: "192x192" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

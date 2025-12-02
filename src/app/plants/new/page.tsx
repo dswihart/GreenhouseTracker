@@ -12,6 +12,8 @@ const stages: { value: PlantStage; label: string }[] = [
   { value: "seed", label: "Seed" },
   { value: "seedling", label: "Seedling" },
   { value: "vegetative", label: "Vegetative" },
+  { value: "flowering", label: "Flowering" },
+  { value: "harvest_ready", label: "Harvest Ready" },
 ];
 
 const categories = [
@@ -35,6 +37,7 @@ export default function NewPlantPage() {
   const { addPlants } = usePlantStore();
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [inputTab, setInputTab] = useState<"barcode" | "url" | "manual">("barcode");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [urlLookupLoading, setUrlLookupLoading] = useState(false);
   const [error, setError] = useState("");
@@ -72,6 +75,10 @@ export default function NewPlantPage() {
     photo_url: "",
     category: "",
     days_to_maturity: "",
+    germination_days: "",
+    height_inches: "",
+    spacing_inches: "",
+    planting_depth_inches: "",
     current_stage: "seed" as PlantStage,
   });
 
@@ -138,6 +145,13 @@ export default function NewPlantPage() {
       const data = await response.json();
 
       if (data.found) {
+        // Parse numeric values from strings like "12 inches" or "1/4 inch"
+        const parseInches = (str: string | null | undefined): string => {
+          if (!str) return "";
+          const match = str.match(/([\d.]+)/);
+          return match ? match[1] : "";
+        };
+
         setFormData((prev) => ({
           ...prev,
           name: data.name || prev.name,
@@ -146,6 +160,10 @@ export default function NewPlantPage() {
           photo_url: data.imageUrl || prev.photo_url,
           category: data.category || prev.category,
           days_to_maturity: data.daysToMaturity?.toString() || prev.days_to_maturity,
+          germination_days: data.daysToGermination ? parseInches(data.daysToGermination) : prev.germination_days,
+          height_inches: parseInches(data.height) || prev.height_inches,
+          spacing_inches: parseInches(data.spacing) || prev.spacing_inches,
+          planting_depth_inches: parseInches(data.plantingDepth) || prev.planting_depth_inches,
         }));
 
         // Store ALL growing information
@@ -248,34 +266,79 @@ export default function NewPlantPage() {
     <div className="p-4 max-w-lg mx-auto">
       <h2 className="text-2xl font-bold mb-6">Add New Plant</h2>
 
-      {/* Barcode Scanner Button - Large and Prominent */}
+      {/* Input Method Tabs */}
       <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => setScanning(true)}
-          disabled={lookupLoading || urlLookupLoading}
-          className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-purple-800 disabled:to-indigo-800 text-white p-6 rounded-2xl font-bold text-xl shadow-lg shadow-purple-900/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-4"
-        >
-          {lookupLoading ? (
-            <>
-              <span className="text-3xl animate-spin">&#8987;</span>
-              <span>Looking up product...</span>
-            </>
-          ) : (
-            <>
-              <span className="text-4xl">&#128247;</span>
-              <div className="text-left">
-                <div>Scan Seed Packet Barcode</div>
-                <div className="text-sm font-normal text-purple-200">
-                  Use camera to scan barcode
-                </div>
-              </div>
-            </>
-          )}
-        </button>
+        <div className="flex gap-2 bg-slate-800 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setInputTab("barcode")}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+              inputTab === "barcode"
+                ? "bg-purple-600 text-white"
+                : "text-slate-400 hover:text-white hover:bg-slate-700"
+            }`}
+          >
+            <span>&#128247;</span>
+            <span>Barcode</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputTab("url")}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+              inputTab === "url"
+                ? "bg-cyan-600 text-white"
+                : "text-slate-400 hover:text-white hover:bg-slate-700"
+            }`}
+          >
+            <span>&#128279;</span>
+            <span>URL</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputTab("manual")}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+              inputTab === "manual"
+                ? "bg-green-600 text-white"
+                : "text-slate-400 hover:text-white hover:bg-slate-700"
+            }`}
+          >
+            <span>&#9997;</span>
+            <span>Manual</span>
+          </button>
+        </div>
       </div>
 
+      {/* Barcode Scanner Section */}
+      {inputTab === "barcode" && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setScanning(true)}
+            disabled={lookupLoading || urlLookupLoading}
+            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:from-purple-800 disabled:to-indigo-800 text-white p-6 rounded-2xl font-bold text-xl shadow-lg shadow-purple-900/30 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-4"
+          >
+            {lookupLoading ? (
+              <>
+                <span className="text-3xl animate-spin">&#8987;</span>
+                <span>Looking up product...</span>
+              </>
+            ) : (
+              <>
+                <span className="text-4xl">&#128247;</span>
+                <div className="text-left">
+                  <div>Scan Seed Packet Barcode</div>
+                  <div className="text-sm font-normal text-purple-200">
+                    Use camera to scan barcode
+                  </div>
+                </div>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* URL Import Section */}
+      {inputTab === "url" && (
       <div className="mb-4 p-4 bg-gradient-to-br from-cyan-900/40 to-blue-900/40 border border-cyan-600/40 rounded-2xl">
         <form onSubmit={handleUrlImport}>
           <label className="block text-sm font-medium text-cyan-300 mb-2 flex items-center gap-2">
@@ -283,14 +346,31 @@ export default function NewPlantPage() {
             Import from Seed Vendor URL
           </label>
           <div className="flex gap-3">
-            <input
-              type="url"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://www.burpee.com/..."
-              className="flex-1 px-4 py-3 bg-slate-800 border-2 border-cyan-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-lg placeholder-slate-500"
-              disabled={urlLookupLoading || lookupLoading}
-            />
+            <div className="relative flex-1">
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://www.burpee.com/..."
+                className="w-full px-4 py-3 pr-10 bg-slate-800 border-2 border-cyan-600/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-lg placeholder-slate-500"
+                disabled={urlLookupLoading || lookupLoading}
+              />
+              {urlInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUrlInput("");
+                    setGrowingInfo(null);
+                    setError("");
+                    setScanSuccess("");
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xl transition-colors"
+                  aria-label="Clear URL"
+                >
+                  &#10005;
+                </button>
+              )}
+            </div>
             <button
               type="submit"
               disabled={urlLookupLoading || lookupLoading || !urlInput.trim()}
@@ -314,8 +394,10 @@ export default function NewPlantPage() {
           </p>
         </form>
       </div>
+      )}
 
       {/* Manual Barcode Entry */}
+      {inputTab === "manual" && (
       <form onSubmit={handleManualBarcodeSubmit} className="mb-8">
         <label className="block text-sm font-medium text-slate-400 mb-2">
           Or type barcode number manually:
@@ -338,6 +420,7 @@ export default function NewPlantPage() {
           </button>
         </div>
       </form>
+      )}
 
       {/* Divider */}
       <div className="flex items-center gap-4 mb-6">
@@ -670,34 +753,53 @@ export default function NewPlantPage() {
           >
             Quantity
           </label>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick subtract buttons */}
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.max(1, quantity - 5))}
+              className="w-12 h-12 bg-red-900/50 hover:bg-red-800/50 text-red-300 text-lg rounded-xl font-bold transition-colors"
+            >
+              -5
+            </button>
             <button
               type="button"
               onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="w-14 h-14 bg-slate-700 hover:bg-slate-600 text-white text-2xl rounded-xl font-bold transition-colors"
+              className="w-12 h-12 bg-slate-700 hover:bg-slate-600 text-white text-xl rounded-xl font-bold transition-colors"
             >
-              -
+              -1
             </button>
+            
+            {/* Quantity input */}
             <input
               id="quantity"
               type="number"
               min="1"
-              max="50"
+              max="100"
               value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-              className="w-24 px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg text-center font-bold"
+              onChange={(e) => setQuantity(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+              className="w-20 px-4 py-4 bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg text-center font-bold"
             />
+            
+            {/* Quick add buttons */}
             <button
               type="button"
-              onClick={() => setQuantity(Math.min(50, quantity + 1))}
-              className="w-14 h-14 bg-slate-700 hover:bg-slate-600 text-white text-2xl rounded-xl font-bold transition-colors"
+              onClick={() => setQuantity(Math.min(100, quantity + 1))}
+              className="w-12 h-12 bg-green-700 hover:bg-green-600 text-white text-xl rounded-xl font-bold transition-colors"
             >
-              +
+              +1
             </button>
-            <span className="text-slate-400 text-sm flex-1">
-              {quantity > 1 && `Creates ${quantity} individual plants`}
-            </span>
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.min(100, quantity + 5))}
+              className="w-12 h-12 bg-green-600 hover:bg-green-500 text-white text-lg rounded-xl font-bold transition-colors"
+            >
+              +5
+            </button>
           </div>
+          <span className="text-slate-400 text-sm mt-2 block">
+            {quantity > 1 && `Creates ${quantity} individual plants`}
+          </span>
         </div>
 
         <div className="flex gap-4 pt-6">

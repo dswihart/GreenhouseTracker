@@ -22,6 +22,8 @@ interface ZoneCanvasProps {
   onPlantClick?: (plantId: string) => void;
   onMoveToTray?: (itemId: string, trayId: string) => void;
   contacts?: Contact[];
+  selectedItems?: Set<string>;
+  assignMode?: boolean;
 }
 
 export function ZoneCanvas({
@@ -34,6 +36,8 @@ export function ZoneCanvas({
   onPlantClick,
   onMoveToTray,
   contacts = [],
+  selectedItems = new Set<string>(),
+  assignMode = false,
 }: ZoneCanvasProps) {
   const { updateZoneItem } = useZoneStore();
   const { plants } = usePlantStore();
@@ -61,7 +65,10 @@ export function ZoneCanvas({
   // Scale to fit both width and height - show entire grid without scrolling
   const scaleX = width / canvasWidth;
   const scaleY = height / canvasHeight;
-  const scale = Math.min(scaleX, scaleY);
+  // On tablets, apply a slight reduction to ensure everything fits with padding
+  const isTablet = typeof window !== "undefined" && window.innerWidth >= 768 && window.innerWidth <= 1024;
+  const tabletScaleFactor = isTablet ? 0.95 : 1;
+  const scale = Math.min(scaleX, scaleY) * tabletScaleFactor;
 
   const scaledWidth = canvasWidth * scale;
   const scaledHeight = canvasHeight * scale;
@@ -108,7 +115,11 @@ export function ZoneCanvas({
     return plant?.current_stage || "seed";
   };
 
-  const getPlantColor = (plantId: string, assignedTo: string | null) => {
+  const getPlantColor = (plantId: string, assignedTo: string | null, itemId: string) => {
+    // Show selection state in assign mode
+    if (assignMode && selectedItems.has(itemId)) {
+      return "#f59e0b"; // Amber for selected
+    }
     if (assignedTo) {
       const contact = contacts.find((c) => c.id === assignedTo);
       if (contact?.color) return contact.color;
@@ -258,7 +269,7 @@ export function ZoneCanvas({
                 <Rect
                   width={CELL_SIZE}
                   height={CELL_SIZE}
-                  fill={getPlantColor(item.plant_id, item.assigned_to)}
+                  fill={getPlantColor(item.plant_id, item.assigned_to, item.id)}
                   cornerRadius={12}
                   shadowColor="black"
                   shadowBlur={8}

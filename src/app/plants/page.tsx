@@ -11,18 +11,24 @@ const stageColors: Record<PlantStage, string> = {
   seed: "from-amber-600 to-amber-700",
   seedling: "from-lime-600 to-lime-700",
   vegetative: "from-green-600 to-green-700",
+  flowering: "from-pink-600 to-pink-700",
+  harvest_ready: "from-orange-600 to-orange-700",
 };
 
 const stageIcons: Record<PlantStage, string> = {
   seed: "🌰",
   seedling: "🌱",
   vegetative: "🌿",
+  flowering: "🌸",
+  harvest_ready: "🥕",
 };
 
 const stageLabels: Record<PlantStage, string> = {
   seed: "Seed",
   seedling: "Seedling",
   vegetative: "Vegetative",
+  flowering: "Flowering",
+  harvest_ready: "Harvest Ready",
 };
 
 export default function PlantsPage() {
@@ -342,20 +348,14 @@ function PlantCard({
     ? Math.min(100, Math.round((daysPlanted! / plant.days_to_maturity) * 100))
     : null;
 
-  const CardWrapper = selectMode ? "div" : Link;
-  const cardProps = selectMode
-    ? { onClick: onToggleSelect }
-    : { href: `/plants/${plant.id}` };
+  const cardClassName = `bg-slate-800/80 rounded-2xl p-5 transition-all border-2 group cursor-pointer ${
+    selected
+      ? "border-red-500 bg-red-900/20"
+      : "border-slate-700/50 hover:border-green-600/50 hover:bg-slate-700/80"
+  } hover:shadow-lg hover:shadow-green-900/20`;
 
-  return (
-    <CardWrapper
-      {...(cardProps as any)}
-      className={`bg-slate-800/80 rounded-2xl p-5 transition-all border-2 group cursor-pointer ${
-        selected
-          ? "border-red-500 bg-red-900/20"
-          : "border-slate-700/50 hover:border-green-600/50 hover:bg-slate-700/80"
-      } hover:shadow-lg hover:shadow-green-900/20`}
-    >
+  const cardContent = (
+    <>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           {selectMode && (
@@ -413,6 +413,20 @@ function PlantCard({
           </div>
         )}
       </div>
-    </CardWrapper>
+    </>
+  );
+
+  if (selectMode) {
+    return (
+      <div onClick={onToggleSelect} className={cardClassName}>
+        {cardContent}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={`/plants/${plant.id}`} className={cardClassName}>
+      {cardContent}
+    </Link>
   );
 }

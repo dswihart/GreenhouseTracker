@@ -7,6 +7,7 @@ const navItems = [
   { href: "/", label: "Home", icon: "🏠" },
   { href: "/plants", label: "Plants", icon: "🌱" },
   { href: "/zones", label: "Zones", icon: "🗺️" },
+  { href: "/planning", label: "Plan", icon: "📋" },
   { href: "/doctor", label: "Doctor", icon: "🩺" },
   { href: "/calendar", label: "Calendar", icon: "📅" },
 ];
