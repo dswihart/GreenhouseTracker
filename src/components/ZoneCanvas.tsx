@@ -8,9 +8,9 @@ import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
 import type { Zone, ZoneItem, ZoneType, Plant, Contact, Tray } from "@/lib/supabase/types";
 
-// Larger cells for better visibility (100px as requested)
-const CELL_SIZE = 100;
-const CELL_GAP = 6;
+// Base cell size - will be scaled to fit
+const BASE_CELL_SIZE = 100;
+const CELL_GAP = 8;
 
 interface ZoneCanvasProps {
   zone: Zone;
@@ -38,7 +38,6 @@ export function ZoneCanvas({
   const { updateZoneItem } = useZoneStore();
   const { plants } = usePlantStore();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<{
     visible: boolean;
     x: number;
@@ -52,22 +51,22 @@ export function ZoneCanvas({
     ? { rows: tray.rows, cols: tray.cols }
     : zone.grid_config;
 
+  // Calculate the actual cell size to fit the grid in the available space
+  const availableWidth = width - 20; // padding
+  const availableHeight = height - 20;
+
+  // Calculate cell size based on available space
+  const cellSizeFromWidth = (availableWidth - (CELL_GAP * (gridConfig.cols - 1))) / gridConfig.cols;
+  const cellSizeFromHeight = (availableHeight - (CELL_GAP * (gridConfig.rows - 1))) / gridConfig.rows;
+
+  // Use the smaller of the two to ensure grid fits, with minimum size for touch targets
+  const CELL_SIZE = Math.max(60, Math.min(cellSizeFromWidth, cellSizeFromHeight, BASE_CELL_SIZE));
+
   const cellUnit = CELL_SIZE + CELL_GAP;
 
-  // Calculate full canvas dimensions
-  const canvasWidth = gridConfig.cols * cellUnit;
-  const canvasHeight = gridConfig.rows * cellUnit;
-
-  // Scale to fit both width and height - show entire grid without scrolling
-  const scaleX = width / canvasWidth;
-  const scaleY = height / canvasHeight;
-  // On tablets, apply a slight reduction to ensure everything fits with padding
-  const isTablet = typeof window !== "undefined" && window.innerWidth >= 768 && window.innerWidth <= 1024;
-  const tabletScaleFactor = isTablet ? 0.95 : 1;
-  const scale = Math.min(scaleX, scaleY) * tabletScaleFactor;
-
-  const scaledWidth = canvasWidth * scale;
-  const scaledHeight = canvasHeight * scale;
+  // Calculate actual canvas dimensions
+  const canvasWidth = gridConfig.cols * CELL_SIZE + (gridConfig.cols - 1) * CELL_GAP;
+  const canvasHeight = gridConfig.rows * CELL_SIZE + (gridConfig.rows - 1) * CELL_GAP;
 
   const handleDragEnd = useCallback(
     async (itemId: string, e: KonvaEventObject<DragEvent>) => {
@@ -172,17 +171,14 @@ export function ZoneCanvas({
 
   const zoneColors = getZoneColors(zone.type);
 
-  // Calculate scaled cell size for text
-  const scaledCellSize = CELL_SIZE * scale;
-
   const handleMouseEnter = (item: ZoneItem, e: KonvaEventObject<MouseEvent>) => {
     const plant = plants.find((p) => p.id === item.plant_id);
     if (!plant) return;
 
-    const cellX = item.x * cellUnit * scale;
-    const cellY = item.y * cellUnit * scale;
+    const cellX = item.x * cellUnit;
+    const cellY = item.y * cellUnit;
 
-    const tooltipX = cellX + scaledCellSize + 10;
+    const tooltipX = cellX + CELL_SIZE + 10;
     const tooltipY = cellY;
 
     setTooltip({
@@ -198,22 +194,24 @@ export function ZoneCanvas({
     setTooltip({ visible: false, x: 0, y: 0, plant: null, item: null });
   };
 
+  // Calculate font sizes based on cell size
+  const nameFontSize = Math.max(10, Math.min(14, CELL_SIZE / 7));
+  const stageFontSize = Math.max(8, Math.min(10, CELL_SIZE / 10));
+  const stageBarHeight = Math.max(10, CELL_SIZE / 8);
+
   return (
     <div
-      ref={containerRef}
-      className="relative rounded-xl flex items-center justify-center"
+      className="relative rounded-xl flex items-start justify-start overflow-hidden"
       style={{
         width: width,
-        height: scaledHeight + 20,
+        height: canvasHeight + 20,
         backgroundColor: zoneColors.bg,
         padding: "10px",
       }}
     >
       <Stage
-        width={scaledWidth}
-        height={scaledHeight}
-        scaleX={scale}
-        scaleY={scale}
+        width={canvasWidth}
+        height={canvasHeight}
       >
         {/* Grid Layer */}
         <Layer>
@@ -226,7 +224,7 @@ export function ZoneCanvas({
                 width={CELL_SIZE}
                 height={CELL_SIZE}
                 fill={zoneColors.cell}
-                cornerRadius={12}
+                cornerRadius={Math.min(12, CELL_SIZE / 8)}
                 stroke={zoneColors.border}
                 strokeWidth={2}
               />
@@ -239,8 +237,9 @@ export function ZoneCanvas({
           {items.map((item) => {
             const plantName = getPlantName(item.plant_id);
             const plantStage = getPlantStage(item.plant_id);
-            const displayName = plantName.length > 10
-              ? plantName.substring(0, 9) + "..."
+            const maxChars = Math.floor(CELL_SIZE / 8);
+            const displayName = plantName.length > maxChars
+              ? plantName.substring(0, maxChars - 1) + "..."
               : plantName;
 
             return (
@@ -262,30 +261,30 @@ export function ZoneCanvas({
                   width={CELL_SIZE}
                   height={CELL_SIZE}
                   fill={getPlantColor(item.plant_id, item.assigned_to)}
-                  cornerRadius={12}
+                  cornerRadius={Math.min(12, CELL_SIZE / 8)}
                   shadowColor="black"
-                  shadowBlur={8}
+                  shadowBlur={6}
                   shadowOpacity={0.4}
-                  shadowOffsetY={3}
+                  shadowOffsetY={2}
                 />
 
                 {/* Stage Indicator Bar */}
                 <Rect
-                  y={CELL_SIZE - 12}
+                  y={CELL_SIZE - stageBarHeight}
                   width={CELL_SIZE}
-                  height={12}
+                  height={stageBarHeight}
                   fill="rgba(0,0,0,0.3)"
-                  cornerRadius={[0, 0, 12, 12]}
+                  cornerRadius={[0, 0, Math.min(12, CELL_SIZE / 8), Math.min(12, CELL_SIZE / 8)]}
                 />
 
                 {/* Stage Text */}
                 <Text
                   text={getStageIcon(plantStage)}
-                  fontSize={10}
+                  fontSize={stageFontSize}
                   fill="rgba(255,255,255,0.8)"
                   width={CELL_SIZE}
-                  y={CELL_SIZE - 11}
-                  height={10}
+                  y={CELL_SIZE - stageBarHeight + 1}
+                  height={stageBarHeight - 2}
                   align="center"
                   fontStyle="bold"
                 />
@@ -293,16 +292,17 @@ export function ZoneCanvas({
                 {/* Plant Name */}
                 <Text
                   text={displayName}
-                  fontSize={14}
+                  fontSize={nameFontSize}
                   fill="white"
                   width={CELL_SIZE}
-                  height={CELL_SIZE - 16}
+                  height={CELL_SIZE - stageBarHeight}
                   align="center"
                   verticalAlign="middle"
                   fontStyle="bold"
                   shadowColor="black"
-                  shadowBlur={3}
+                  shadowBlur={2}
                   shadowOpacity={0.6}
+                  padding={4}
                 />
               </Group>
             );
@@ -319,13 +319,13 @@ export function ZoneCanvas({
           <div
             className="absolute pointer-events-none z-50 bg-slate-900/95 border border-slate-500 rounded-xl p-4 shadow-2xl backdrop-blur-sm"
             style={{
-              left: `${tooltip.x}px`,
+              left: `${Math.min(tooltip.x, width - 200)}px`,
               top: `${tooltip.y}px`,
-              minWidth: "180px",
-              maxWidth: "240px",
+              minWidth: "160px",
+              maxWidth: "220px",
             }}
           >
-            <div className="font-bold text-white text-lg mb-1">
+            <div className="font-bold text-white text-base mb-1">
               {tooltip.plant.name}
             </div>
             {tooltip.plant.species && (
