@@ -22,8 +22,6 @@ interface ZoneCanvasProps {
   onPlantClick?: (plantId: string) => void;
   onMoveToTray?: (itemId: string, trayId: string) => void;
   contacts?: Contact[];
-  selectedItems?: Set<string>;
-  assignMode?: boolean;
 }
 
 export function ZoneCanvas({
@@ -36,8 +34,6 @@ export function ZoneCanvas({
   onPlantClick,
   onMoveToTray,
   contacts = [],
-  selectedItems = new Set<string>(),
-  assignMode = false,
 }: ZoneCanvasProps) {
   const { updateZoneItem } = useZoneStore();
   const { plants } = usePlantStore();
@@ -115,11 +111,7 @@ export function ZoneCanvas({
     return plant?.current_stage || "seed";
   };
 
-  const getPlantColor = (plantId: string, assignedTo: string | null, itemId: string) => {
-    // Show selection state in assign mode
-    if (assignMode && selectedItems.has(itemId)) {
-      return "#f59e0b"; // Amber for selected
-    }
+  const getPlantColor = (plantId: string, assignedTo: string | null) => {
     if (assignedTo) {
       const contact = contacts.find((c) => c.id === assignedTo);
       if (contact?.color) return contact.color;
@@ -269,7 +261,7 @@ export function ZoneCanvas({
                 <Rect
                   width={CELL_SIZE}
                   height={CELL_SIZE}
-                  fill={getPlantColor(item.plant_id, item.assigned_to, item.id)}
+                  fill={getPlantColor(item.plant_id, item.assigned_to)}
                   cornerRadius={12}
                   shadowColor="black"
                   shadowBlur={8}

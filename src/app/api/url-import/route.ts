@@ -73,13 +73,18 @@ function getVendorName(hostname: string): string {
     "botanicalinterests.com": "Botanical Interests",
     "seedsnow.com": "Seeds N Such",
     "edenbrothers.com": "Eden Brothers",
+    "amazon.com": "Amazon",
+    "homedepot.com": "Home Depot",
+    "lowes.com": "Lowe's",
+    "walmart.com": "Walmart",
+    "target.com": "Target",
   };
 
   const cleanHost = hostname.replace(/^www\./, "");
-  return vendorNames[cleanHost] || cleanHost;
+  return vendorNames[cleanHost] || cleanHost.replace(/\.[^.]+$/, "").replace(/^www\./, "").replace(/\./g, " ").split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-// Validate URL and extract hostname
+// Validate URL and extract hostname - now accepts any URL
 function validateUrl(urlString: string): { valid: boolean; hostname: string; error?: string } {
   try {
     const url = new URL(urlString);
@@ -89,18 +94,6 @@ function validateUrl(urlString: string): { valid: boolean; hostname: string; err
     }
 
     const hostname = url.hostname.toLowerCase();
-    const isSupported = SUPPORTED_DOMAINS.some(
-      domain => hostname === domain || hostname.endsWith("." + domain)
-    );
-
-    if (!isSupported) {
-      return {
-        valid: false,
-        hostname,
-        error: "This seed vendor is not yet supported. Try Burpee, Johnny's Seeds, Baker Creek, or other major vendors."
-      };
-    }
-
     return { valid: true, hostname };
   } catch {
     return { valid: false, hostname: "", error: "Please enter a valid URL" };
@@ -400,7 +393,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       found: false,
       error: validation.error,
-      supportedVendors: ["Burpee", "Johnny's Seeds", "Baker Creek", "Seed Savers", "Park Seed", "Territorial Seed"]
     }, { status: 400 });
   }
 
@@ -410,25 +402,27 @@ export async function GET(request: NextRequest) {
     let html: string = "";
     let fetchMethod = "direct";
 
-    // Try direct fetch first (faster, works for most seed sites)
+    // Try direct fetch first (faster, works for most sites)
     try {
       const directResponse = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
         },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (directResponse.ok) {
         html = await directResponse.text();
-        // Check if we got meaningful content (not just a shell for JS rendering)
-        if (html.length < 5000 || !html.includes("product") && !html.includes("seed")) {
-          html = ""; // Reset to trigger ScraperAPI fallback
+        // Check if we got meaningful content
+        if (html.length < 2000) {
+          html = ""; // Reset to trigger fallback
         }
       }
-    } catch {
+    } catch (e) {
+      console.log("Direct fetch failed:", e);
       // Direct fetch failed, will try ScraperAPI
     }
 

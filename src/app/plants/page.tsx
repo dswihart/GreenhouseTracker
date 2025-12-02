@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
 import { usePlantStore } from "@/store/plantStore";
 import { supabase } from "@/lib/supabase/client";
-import type { PlantStage, Plant } from "@/lib/supabase/types";
+import type { PlantStage, Plant, Contact, ZoneItem } from "@/lib/supabase/types";
 
 const stageColors: Record<PlantStage, string> = {
   seed: "from-amber-600 to-amber-700",
@@ -39,6 +39,10 @@ export default function PlantsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedPlants, setSelectedPlants] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [zoneItems, setZoneItems] = useState<ZoneItem[]>([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -54,6 +58,23 @@ export default function PlantsPage() {
       if (data) {
         setPlants(data);
       }
+
+      // Load contacts
+      const { data: contactsData } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("user_id", user.id);
+      if (contactsData) {
+        const colors = ["#22c55e", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b", "#06b6d4"];
+        setContacts(contactsData.map((c, i) => ({ ...c, color: c.color || colors[i % colors.length] })));
+      }
+
+      // Load zone items to know which plants are placed
+      const { data: zoneItemsData } = await supabase.from("zone_items").select("*");
+      if (zoneItemsData) {
+        setZoneItems(zoneItemsData);
+      }
+
       setLoading(false);
     };
 

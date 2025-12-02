@@ -66,6 +66,17 @@ export default function ZoneDetailPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [dragOverTrayId, setDragOverTrayId] = useState<string | null>(null);
   const [assigningItem, setAssigningItem] = useState<string | null>(null);
+  const [selectedPlantForAdd, setSelectedPlantForAdd] = useState<string | null>(null);
+  const [addQuantity, setAddQuantity] = useState(1);
+  const [addTab, setAddTab] = useState<"select" | "barcode" | "url">("select");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importSuccess, setImportSuccess] = useState("");
+  const [assignToOnAdd, setAssignToOnAdd] = useState<string | null>(null);
+  const [dragOverContact, setDragOverContact] = useState<string | null>(null);
 
   const zoneId = params.id as string;
   const zone = zones.find((z) => z.id === zoneId);
@@ -170,7 +181,7 @@ export default function ZoneDetailPage() {
     (plant) => !zoneItems.some((item) => item.plant_id === plant.id)
   );
 
-  const handleAddToZone = async (plantId: string) => {
+  const handleAddToZone = async (plantId: string, quantity: number = 1, assignTo: string | null = null) => {
     if (!zone || !activeTray) return;
 
     // Find first empty cell in active tray
@@ -199,6 +210,7 @@ export default function ZoneDetailPage() {
               tray_id: activeTray.id,
               x,
               y,
+              assigned_to: assignTo,
             })
             .select()
             .single();
@@ -216,6 +228,153 @@ export default function ZoneDetailPage() {
   const handleRemoveFromZone = async (itemId: string) => {
     await supabase.from("zone_items").delete().eq("id", itemId);
     removeZoneItem(itemId);
+  };
+
+  const handleBarcodeImport = async () => {
+    if (!barcodeInput.trim() || !user || !activeTray) return;
+    setBarcodeLoading(true);
+    setImportError("");
+    setImportSuccess("");
+    try {
+      const response = await fetch(`/api/barcode-lookup?code=${encodeURIComponent(barcodeInput.trim())}`);
+      const data = await response.json();
+      if (data.found) {
+        const { data: newPlant, error } = await supabase
+          .from("plants")
+          .insert({
+            user_id: user.id,
+            name: data.name || "Unknown Plant",
+            species: data.species || null,
+            description: data.description || null,
+            photo_url: data.imageUrl || null,
+            days_to_maturity: data.daysToMaturity || null,
+            current_stage: "seed",
+            date_planted: new Date().toISOString().split("T")[0],
+          })
+          .select()
+          .single();
+        if (newPlant && !error) {
+          setPlants([...plants, newPlant]);
+          await handleAddToZone(newPlant.id, addQuantity, assignToOnAdd);
+          setImportSuccess(`Added ${addQuantity}x ${data.name}`);
+          setBarcodeInput("");
+          setAddQuantity(1);
+        }
+      } else {
+        setImportError("Barcode not found. Try URL or select existing.");
+      }
+    } catch (err) {
+      setImportError("Failed to lookup barcode.");
+    } finally {
+      setBarcodeLoading(false);
+    }
+  };
+
+  const handleUrlImport = async () => {
+    if (!urlInput.trim() || !user || !activeTray) return;
+    setUrlLoading(true);
+    setImportError("");
+    setImportSuccess("");
+    try {
+      const response = await fetch(`/api/url-import?url=${encodeURIComponent(urlInput.trim())}`);
+      const data = await response.json();
+      if (data.found) {
+        // Parse growing values - handles fractions (1/4), ranges (7-14), and special cases
+        const parseGrowingValue = (str: string | null, useAverage: boolean = false): number | null => {
+          if (!str) return null;
+          const normalized = str.toLowerCase().trim();
+
+          // Handle special cases like "surface sow" for planting depth
+          if (normalized.includes('surface')) return 0;
+
+          // Handle fraction patterns: 1/4, 1/2, 3/4, etc.
+          const fractionMatch = normalized.match(/(\d+)\s*\/\s*(\d+)/);
+          if (fractionMatch) {
+            const numerator = parseInt(fractionMatch[1]);
+            const denominator = parseInt(fractionMatch[2]);
+            if (denominator !== 0) {
+              // Check for mixed number like "1 1/2"
+              const mixedMatch = normalized.match(/(\d+)\s+(\d+)\s*\/\s*(\d+)/);
+              if (mixedMatch) {
+                const whole = parseInt(mixedMatch[1]);
+                const fracNum = parseInt(mixedMatch[2]);
+                const fracDen = parseInt(mixedMatch[3]);
+                return whole + (fracNum / fracDen);
+              }
+              return numerator / denominator;
+            }
+          }
+
+          // Handle ranges like "18-24" or "18 to 24"
+          const rangeMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)/);
+          if (rangeMatch) {
+            const first = parseFloat(rangeMatch[1]);
+            const second = parseFloat(rangeMatch[2]);
+            return useAverage ? Math.round((first + second) / 2) : first;
+          }
+
+          // Handle simple numbers (including decimals)
+          const numMatch = normalized.match(/(\d+(?:\.\d+)?)/);
+          if (numMatch) {
+            return parseFloat(numMatch[1]);
+          }
+
+          return null;
+        };
+
+        // Build comprehensive description
+        const lines: string[] = [];
+        if (data.description) lines.push(data.description);
+        if (data.sunRequirements) lines.push("Sun: " + data.sunRequirements);
+        if (data.wateringNeeds) lines.push("Water: " + data.wateringNeeds);
+        if (data.soilRequirements) lines.push("Soil: " + data.soilRequirements);
+        if (data.plantingDepth) lines.push("Planting Depth: " + data.plantingDepth);
+        if (data.spacing) lines.push("Spacing: " + data.spacing);
+        if (data.rowSpacing) lines.push("Row Spacing: " + data.rowSpacing);
+        if (data.height) lines.push("Height: " + data.height);
+        if (data.spread) lines.push("Spread: " + data.spread);
+        if (data.daysToGermination) lines.push("Germination: " + data.daysToGermination);
+        if (data.seedCount) lines.push("Seeds: " + data.seedCount);
+        if (data.transplantInfo) lines.push("Transplant: " + data.transplantInfo);
+        if (data.sowingInstructions) lines.push("Sowing: " + data.sowingInstructions);
+        if (data.harvestInfo) lines.push("Harvest: " + data.harvestInfo);
+        if (data.growingTips) lines.push("Tips: " + data.growingTips);
+        const fullDesc = lines.join("\n");
+
+        const { data: newPlant, error } = await supabase
+          .from("plants")
+          .insert({
+            user_id: user.id,
+            name: data.name || "Unknown Plant",
+            species: data.species || data.variety || null,
+            description: fullDesc || null,
+            photo_url: data.imageUrl || null,
+            category: data.category || null,
+            days_to_maturity: data.daysToMaturity || null,
+            germination_days: parseGrowingValue(data.daysToGermination, true),
+            height_inches: parseGrowingValue(data.height, false),
+            spacing_inches: parseGrowingValue(data.spacing, false),
+            planting_depth_inches: parseGrowingValue(data.plantingDepth, false),
+            current_stage: "seed",
+            date_planted: new Date().toISOString().split("T")[0],
+          })
+          .select()
+          .single();
+        if (newPlant && !error) {
+          setPlants([...plants, newPlant]);
+          await handleAddToZone(newPlant.id, addQuantity, assignToOnAdd);
+          setImportSuccess(`Added ${addQuantity}x ${data.name}`);
+          setUrlInput("");
+          setAddQuantity(1);
+        }
+      } else {
+        setImportError("Could not extract plant info from URL.");
+      }
+    } catch (err) {
+      setImportError("Failed to import from URL.");
+    } finally {
+      setUrlLoading(false);
+    }
   };
 
   const handleTransplantClick = (plantId: string) => {
@@ -517,19 +676,44 @@ export default function ZoneDetailPage() {
             )}
           </div>
 
-          {/* Contact Legend */}
+          {/* Drag to Assign */}
           {contacts.length > 0 && (
             <div className="px-4 pb-2">
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-xs text-slate-500">People:</span>
+              <div className="text-xs text-slate-500 mb-2">Drag plant here to assign:</div>
+              <div className="flex flex-wrap gap-2">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverContact("none"); }}
+                  onDragLeave={() => setDragOverContact(null)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const itemId = e.dataTransfer.getData("itemId");
+                    if (itemId) await handleAssignContact(itemId, null);
+                    setDragOverContact(null);
+                  }}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    dragOverContact === "none" ? "bg-slate-500 ring-2 ring-white" : "bg-slate-700"
+                  }`}
+                >
+                  Unassigned
+                </div>
                 {contacts.map((contact) => (
-                  <span
+                  <div
                     key={contact.id}
-                    className="px-2 py-1 rounded text-xs font-medium"
-                    style={{ backgroundColor: contact.color || "#22c55e" }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverContact(contact.id); }}
+                    onDragLeave={() => setDragOverContact(null)}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      const itemId = e.dataTransfer.getData("itemId");
+                      if (itemId) await handleAssignContact(itemId, contact.id);
+                      setDragOverContact(null);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      dragOverContact === contact.id ? "ring-2 ring-white" : ""
+                    }`}
+                    style={{ backgroundColor: contact.color }}
                   >
                     {contact.name}
-                  </span>
+                  </div>
                 ))}
               </div>
             </div>

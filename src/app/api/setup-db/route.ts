@@ -48,38 +48,20 @@ export async function GET() {
     // Add growing info columns to plants
     const { error: growingInfoError } = await supabase.rpc('exec_sql', {
       sql: `
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN description TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN sun_requirements TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN watering_needs TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN planting_depth TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN spacing TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN harvest_info TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN growing_tips TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
-        DO $$ BEGIN
-          ALTER TABLE plants ADD COLUMN image_url TEXT;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN sun_requirements TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN watering_needs TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN soil_requirements TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN sowing_instructions TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN transplant_info TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN harvest_info TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN growing_tips TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN row_spacing TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN spread TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN seed_count TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_hybrid BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_heirloom BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN is_organic BOOLEAN; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+        DO $$ BEGIN ALTER TABLE plants ADD COLUMN resistances TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
       `
     });
 

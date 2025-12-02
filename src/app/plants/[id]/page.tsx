@@ -340,19 +340,65 @@ export default function PlantDetailPage() {
           </button>
         </div>
 
-        {/* Photo and Description */}
-        {(plant.photo_url || plant.description) && (
-          <div className="bg-slate-800 rounded-lg overflow-hidden">
-            {plant.photo_url && (
-              <img
-                src={plant.photo_url}
-                alt={plant.name}
-                className="w-full h-48 object-cover"
-              />
-            )}
-            {plant.description && (
-              <p className="p-4 text-slate-300 text-sm">{plant.description}</p>
-            )}
+        {/* Photo */}
+        {plant.photo_url && (
+          <div className="bg-slate-800 rounded-lg overflow-hidden mb-6">
+            <img
+              src={plant.photo_url}
+              alt={plant.name}
+              className="w-full h-48 object-cover"
+            />
+          </div>
+        )}
+
+        {/* Growing Information */}
+        {plant.description && (
+          <div className="bg-slate-800 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2 text-green-400">
+              <span>🌱</span> Growing Information
+            </h3>
+            <div className="space-y-3">
+              {plant.description.split("\n").map((line, idx) => {
+                if (!line.trim()) return null;
+
+                // Parse the line to add icons
+                let icon = "📝";
+                let label = "";
+                let value = line;
+
+                if (line.startsWith("Sun:")) { icon = "☀️"; label = "Sun"; value = line.replace("Sun:", "").trim(); }
+                else if (line.startsWith("Water:")) { icon = "💧"; label = "Water"; value = line.replace("Water:", "").trim(); }
+                else if (line.startsWith("Soil:")) { icon = "🪴"; label = "Soil"; value = line.replace("Soil:", "").trim(); }
+                else if (line.startsWith("Planting Depth:")) { icon = "📏"; label = "Planting Depth"; value = line.replace("Planting Depth:", "").trim(); }
+                else if (line.startsWith("Spacing:")) { icon = "↔️"; label = "Spacing"; value = line.replace("Spacing:", "").trim(); }
+                else if (line.startsWith("Row Spacing:")) { icon = "↕️"; label = "Row Spacing"; value = line.replace("Row Spacing:", "").trim(); }
+                else if (line.startsWith("Height:")) { icon = "📐"; label = "Height"; value = line.replace("Height:", "").trim(); }
+                else if (line.startsWith("Spread:")) { icon = "🌿"; label = "Spread"; value = line.replace("Spread:", "").trim(); }
+                else if (line.startsWith("Germination:")) { icon = "🌱"; label = "Germination"; value = line.replace("Germination:", "").trim(); }
+                else if (line.startsWith("Sowing:")) { icon = "🌰"; label = "Sowing"; value = line.replace("Sowing:", "").trim(); }
+                else if (line.startsWith("Transplant:")) { icon = "🔄"; label = "Transplanting"; value = line.replace("Transplant:", "").trim(); }
+                else if (line.startsWith("Harvest:")) { icon = "🥬"; label = "Harvest"; value = line.replace("Harvest:", "").trim(); }
+                else if (line.startsWith("Tips:")) { icon = "💡"; label = "Growing Tips"; value = line.replace("Tips:", "").trim(); }
+                else if (line.startsWith("Seeds:")) { icon = "🔢"; label = "Seeds in Packet"; value = line.replace("Seeds:", "").trim(); }
+                else { label = ""; value = line; }
+
+                return (
+                  <div key={idx} className={label ? "flex items-start gap-3" : "text-slate-300 text-sm"}>
+                    {label ? (
+                      <>
+                        <span className="text-xl flex-shrink-0">{icon}</span>
+                        <div>
+                          <div className="text-slate-400 text-xs">{label}</div>
+                          <div className="text-slate-200">{value}</div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-slate-300">{value}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
