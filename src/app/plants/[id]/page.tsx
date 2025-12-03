@@ -72,6 +72,8 @@ export default function PlantDetailPage() {
   const [spacingInput, setSpacingInput] = useState("");
   const [editingDepth, setEditingDepth] = useState(false);
   const [depthInput, setDepthInput] = useState("");
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
 
   const plantId = params.id as string;
 
@@ -298,12 +300,22 @@ export default function PlantDetailPage() {
       <div className="mb-6">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <Link
-              href="/plants"
-              className="text-slate-400 hover:text-slate-300 text-sm mb-2 inline-block"
-            >
-              &larr; Back to plants
-            </Link>
+            <div className="flex gap-3 mb-2">
+              {zoneItem ? (
+                <Link
+                  href={`/zones/${zoneItem.zone_id}`}
+                  className="text-green-400 hover:text-green-300 text-sm inline-flex items-center gap-1 bg-green-900/30 px-3 py-1 rounded-full"
+                >
+                  &larr; Back to Tray
+                </Link>
+              ) : null}
+              <Link
+                href="/plants"
+                className="text-slate-400 hover:text-slate-300 text-sm inline-flex items-center gap-1"
+              >
+                &larr; All Plants
+              </Link>
+            </div>
             <h2 className="text-2xl font-bold">{plant.name}</h2>
             {plant.species && (
               <p className="text-slate-400">{plant.species}</p>

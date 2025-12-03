@@ -181,8 +181,8 @@ export default function ZoneDetailPage() {
     ? zoneItemsForThisZone.filter((item) => item.tray_id === activeTray.id || (!item.tray_id && zoneTrays.indexOf(activeTray) === 0))
     : zoneItemsForThisZone.filter((item) => !item.tray_id);
 
-  const unplacedPlants = plants.filter(
-    (plant) => !zoneItems.some((item) => item.plant_id === plant.id)
+  const availablePlants = plants.filter(
+    (plant) => plant.current_stage !== "seed" || plant.date_planted !== null
   );
 
   const handleAddToZone = async (plantId: string, quantity: number = 1, assignTo: string | null = null) => {
@@ -574,7 +574,7 @@ export default function ZoneDetailPage() {
               <div className="text-sm text-slate-400">Plants</div>
             </div>
             <div className="bg-slate-800/50 rounded-xl p-3 text-center">
-              <div className="text-2xl font-bold text-slate-300">{unplacedPlants.length}</div>
+              <div className="text-2xl font-bold text-slate-300">{availablePlants.length}</div>
               <div className="text-sm text-slate-400">Unplaced</div>
             </div>
           </div>
@@ -632,6 +632,26 @@ export default function ZoneDetailPage() {
         </div>
       </div>
 
+
+      {/* Person Assignment Legend */}
+      {contacts.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2 items-center">
+          <span className="text-sm text-slate-400 mr-2">Assigned to:</span>
+          {contacts.map(contact => (
+            <div key={contact.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
+              <div 
+                className="w-4 h-4 rounded-full" 
+                style={{ backgroundColor: contact.color }}
+              />
+              <span className="text-sm font-medium">{contact.name}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
+            <div className="w-4 h-4 rounded-full bg-slate-500" />
+            <span className="text-sm text-slate-400">Unassigned</span>
+          </div>
+        </div>
+      )}
 
       {/* Companion Planting Panel */}
       {activeTray && itemsForActiveTray.length > 1 && (() => {
@@ -754,7 +774,7 @@ export default function ZoneDetailPage() {
 
       {/* Add Plant Button - Large and Easy to Tap */}
       <section className="mt-6">
-        {unplacedPlants.length > 0 ? (
+        {availablePlants.length > 0 ? (
           <button
             onClick={() => setShowAddPlantFlow(true)}
             className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white p-6 rounded-2xl font-bold text-xl shadow-lg shadow-green-900/30 transition-all flex items-center justify-center gap-4"
@@ -763,7 +783,7 @@ export default function ZoneDetailPage() {
             <div className="text-left">
               <div className="text-2xl">Add Plant to This Tray</div>
               <div className="text-lg font-normal text-green-100 mt-1">
-                {unplacedPlants.length} plant{unplacedPlants.length !== 1 ? 's' : ''} ready to place
+                {availablePlants.length} plant{availablePlants.length !== 1 ? 's' : ''} ready to place
               </div>
             </div>
           </button>
@@ -848,7 +868,7 @@ export default function ZoneDetailPage() {
           }}
         />
       )}
-      {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={unplacedPlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }}
+      {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={availablePlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }} allPlants={plants}
           allPlants={plants}        />      )}
     </div>
   );

@@ -179,7 +179,7 @@ export default function Dashboard() {
         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
           <span className="text-2xl">⚡</span> Quick Actions
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <ActionCard
             href="/plants/new"
             icon="➕"
@@ -197,6 +197,12 @@ export default function Dashboard() {
             icon="🗺️"
             label="View Zones"
             color="bg-gradient-to-br from-purple-600 to-purple-700"
+          />
+          <ActionCard
+            href="/labels"
+            icon="🏷️"
+            label="Print Labels"
+            color="bg-gradient-to-br from-amber-600 to-amber-700"
           />
           <ActionCard
             href="/reports"

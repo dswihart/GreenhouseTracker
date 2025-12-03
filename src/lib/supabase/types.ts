@@ -37,6 +37,9 @@ export interface Database {
           planting_depth_inches: number | null;
           current_stage: PlantStage;
           created_at: string;
+          seed_count: number | null;
+          variety: string | null;
+          label_name: string | null;
         };
         Insert: {
           id?: string;
@@ -55,6 +58,9 @@ export interface Database {
           spacing_inches?: number | null;
           planting_depth_inches?: number | null;
           current_stage?: PlantStage;
+          seed_count?: number | null;
+          variety?: string | null;
+          label_name?: string | null;
         };
         Update: {
           id?: string;
@@ -73,6 +79,9 @@ export interface Database {
           spacing_inches?: number | null;
           planting_depth_inches?: number | null;
           current_stage?: PlantStage;
+          seed_count?: number | null;
+          variety?: string | null;
+          label_name?: string | null;
         };
       };
       zones: {

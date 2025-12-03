@@ -14,7 +14,7 @@ interface AddPlantFlowProps {
   allPlants?: Plant[];
 }
 
-type Step = "select-plant" | "select-slot" | "select-person";
+type Step = "select-mode" | "select-plant" | "select-slot" | "select-person";
 type Mode = "single" | "bulk";
 
 export function AddPlantFlow({
@@ -24,10 +24,10 @@ export function AddPlantFlow({
   contacts,
   onClose,
   onAddPlant,
-  allPlants = [],
+  allPlants = [] as Plant[],
 }: AddPlantFlowProps) {
   const [mode, setMode] = useState<Mode>("single");
-  const [step, setStep] = useState<Step>("select-plant");
+  const [step, setStep] = useState<Step>("select-mode");
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ x: number; y: number } | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<Array<{ x: number; y: number }>>([]);
@@ -38,8 +38,17 @@ export function AddPlantFlow({
   const [addedSlots, setAddedSlots] = useState<Array<{x: number, y: number}>>([]);
   const [lastPerson, setLastPerson] = useState<string | null>(null);
 
-  const availablePlants = unplacedPlants.filter(p => !addedPlants.includes(p.id));
-  const filteredPlants = availablePlants.filter((plant) =>
+  const availablePlants = allPlants.length > 0 ? allPlants : unplacedPlants;
+  
+  // Sort by last planted (most recent first)
+  const sortedPlants = [...availablePlants].sort((a, b) => {
+    if (!a.date_planted && !b.date_planted) return 0;
+    if (!a.date_planted) return 1;
+    if (!b.date_planted) return -1;
+    return new Date(b.date_planted).getTime() - new Date(a.date_planted).getTime();
+  });
+  
+  const filteredPlants = sortedPlants.filter((plant) =>
     plant.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -154,16 +163,17 @@ export function AddPlantFlow({
   };
 
   // LARGER cells for easier tapping
-  const maxCellSize = 56;
-  const cellSize = Math.min(maxCellSize, Math.floor(280 / Math.max(tray.cols, tray.rows)));
+  // Smaller cells for landscape mode
+  const maxCellSize = 44;
+  const cellSize = Math.min(maxCellSize, Math.floor(240 / Math.max(tray.cols, tray.rows)));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-slate-800 rounded-3xl shadow-2xl max-h-[95vh] overflow-hidden">
+      <div className="relative w-full max-w-lg bg-slate-800 rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header - LARGER text */}
-        <div className="p-5 border-b border-slate-700">
+        <div className="p-3 border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Add Plants</h2>
             <button
@@ -174,29 +184,7 @@ export function AddPlantFlow({
             </button>
           </div>
 
-          {/* Mode Toggle - BIGGER buttons */}
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={() => { setMode("single"); setSelectedSlots([]); }}
-              className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold transition-colors ${
-                mode === "single"
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-              }`}
-            >
-              One at a Time
-            </button>
-            <button
-              onClick={() => { setMode("bulk"); setSelectedSlot(null); }}
-              className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold transition-colors ${
-                mode === "bulk"
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-              }`}
-            >
-              Fill Multiple
-            </button>
-          </div>
+
 
           {addedSlots.length > 0 && (
             <div className="mt-4 flex items-center gap-3 text-green-400 bg-green-900/30 p-3 rounded-xl">
@@ -206,11 +194,54 @@ export function AddPlantFlow({
           )}
         </div>
 
+        {/* Step 0: Select Mode */}
+        {step === "select-mode" && (
+          <div className="p-5 flex-1">
+            <h3 className="text-xl font-bold mb-6 text-center">
+              How would you like to add plants?
+            </h3>
+            
+            <div className="space-y-4">
+              <button
+                onClick={() => { setMode("single"); setStep("select-plant"); }}
+                className="w-full p-6 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-2xl text-left transition-colors border-2 border-transparent hover:border-green-500"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">☝️</span>
+                  <div>
+                    <div className="text-xl font-bold">One at a Time</div>
+                    <div className="text-slate-400">Add plants individually to specific spots</div>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => { setMode("bulk"); setStep("select-plant"); }}
+                className="w-full p-6 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-2xl text-left transition-colors border-2 border-transparent hover:border-green-500"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">✋</span>
+                  <div>
+                    <div className="text-xl font-bold">Fill Multiple Spots</div>
+                    <div className="text-slate-400">Select many cells, then add the same plant</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Step 1: Select Plant */}
         {step === "select-plant" && (
           <div className="p-5 overflow-y-auto" style={{ maxHeight: "55vh" }}>
-            <h3 className="text-xl font-bold mb-4">
-              Step 1: Pick a Plant
+            <button
+              onClick={() => { setStep("select-mode"); setSelectedSlots([]); setSelectedSlot(null); }}
+              className="flex items-center gap-1 text-base text-green-400 hover:text-green-300 mb-3"
+            >
+              <span className="text-xl">←</span> Change Mode
+            </button>
+            <h3 className="text-lg font-bold mb-3">
+              Pick a Plant ({mode === "bulk" ? "Fill Multiple" : "One at a Time"})
             </h3>
 
             {availablePlants.length === 0 ? (
@@ -253,25 +284,26 @@ export function AddPlantFlow({
 
         {/* Step 2: Select Slot(s) */}
         {step === "select-slot" && selectedPlant && (
-          <div className="p-5">
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="p-4 overflow-y-auto flex-1 min-h-0">
             <button
               onClick={() => { setStep("select-plant"); setSelectedSlots([]); }}
-              className="flex items-center gap-2 text-lg text-green-400 hover:text-green-300 mb-4 py-2"
+              className="flex items-center gap-1 text-base text-green-400 hover:text-green-300 mb-2"
             >
-              <span className="text-2xl">←</span> Back to Plants
+              <span className="text-xl">←</span> Back
             </button>
 
-            <h3 className="text-xl font-bold mb-2">
+            <h3 className="text-lg font-bold mb-1">
               Step 2: {mode === "bulk" ? "Tap Cells to Fill" : "Pick a Spot"}
             </h3>
-            <p className="text-lg text-slate-300 mb-4">
+            <p className="text-sm text-slate-300 mb-2">
               Placing: <span className="font-bold text-green-400">{selectedPlant.name}</span>
               {mode === "bulk" && selectedSlots.length > 0 && (
                 <span className="ml-2 text-amber-400">({selectedSlots.length} selected)</span>
               )}
             </p>
 
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-2">
               <div
                 className="grid gap-2 p-4 bg-slate-900 rounded-2xl"
                 style={{ gridTemplateColumns: `repeat(${tray.cols}, ${cellSize}px)` }}
@@ -312,26 +344,30 @@ export function AddPlantFlow({
               </div>
             </div>
 
-            {/* Legend - BIGGER text */}
-            <div className="flex justify-center gap-6 text-base text-slate-300 mb-4">
-              <span className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded border-4 border-green-400 bg-slate-800"></span>
-                Good match
+            {/* Legend - compact */}
+            <div className="flex justify-center gap-4 text-xs text-slate-400 mb-2">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded border-2 border-green-400 bg-slate-800"></span>
+                Good
               </span>
-              <span className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded border-4 border-red-500 bg-slate-800"></span>
-                Bad match
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded border-2 border-red-500 bg-slate-800"></span>
+                Bad
               </span>
             </div>
 
+            </div>
+            {/* Sticky confirm button */}
             {mode === "bulk" && selectedSlots.length > 0 && (
-              <button
-                onClick={handleBulkConfirm}
-                disabled={isAdding}
-                className="w-full py-5 bg-green-600 hover:bg-green-500 active:bg-green-400 text-white text-xl font-bold rounded-2xl disabled:opacity-50"
-              >
-                {isAdding ? "Adding..." : `Plant ${selectedSlots.length} ${selectedPlant.name}`}
-              </button>
+              <div className="p-3 border-t border-slate-700 bg-slate-800 flex-shrink-0">
+                <button
+                  onClick={handleBulkConfirm}
+                  disabled={isAdding}
+                  className="w-full py-3 bg-green-600 hover:bg-green-500 active:bg-green-400 text-white text-lg font-bold rounded-xl disabled:opacity-50"
+                >
+                  {isAdding ? "Adding..." : `Plant ${selectedSlots.length} ${selectedPlant.name}`}
+                </button>
+              </div>
             )}
           </div>
         )}
