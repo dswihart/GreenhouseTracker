@@ -22,6 +22,9 @@ interface ZoneCanvasProps {
   onPlantClick?: (plantId: string) => void;
   onMoveToTray?: (itemId: string, trayId: string) => void;
   contacts?: Contact[];
+  selectMode?: boolean;
+  selectedItems?: string[];
+  onToggleSelect?: (itemId: string) => void;
 }
 
 export function ZoneCanvas({
@@ -34,6 +37,9 @@ export function ZoneCanvas({
   onPlantClick,
   onMoveToTray,
   contacts = [],
+  selectMode = false,
+  selectedItems = [],
+  onToggleSelect,
 }: ZoneCanvasProps) {
   const { updateZoneItem } = useZoneStore();
   const { plants } = usePlantStore();
@@ -99,6 +105,14 @@ export function ZoneCanvas({
     },
     [gridConfig.cols, gridConfig.rows, updateZoneItem, cellUnit]
   );
+
+  const handleItemClick = (itemId: string, plantId: string) => {
+    if (selectMode && onToggleSelect) {
+      onToggleSelect(itemId);
+    } else {
+      onPlantClick?.(plantId);
+    }
+  };
 
   const getPlantName = (plantId: string) => {
     const plant = plants.find((p) => p.id === plantId);
@@ -241,18 +255,19 @@ export function ZoneCanvas({
             const displayName = plantName.length > maxChars
               ? plantName.substring(0, maxChars - 1) + "..."
               : plantName;
+            const isSelected = selectedItems.includes(item.id);
 
             return (
               <Group
                 key={item.id}
                 x={item.x * cellUnit}
                 y={item.y * cellUnit}
-                draggable
+                draggable={!selectMode}
                 onDragEnd={(e) => handleDragEnd(item.id, e)}
-                onClick={() => onPlantClick?.(item.plant_id)}
-                onTap={() => onPlantClick?.(item.plant_id)}
-                onDblClick={() => onTransplant?.(item.plant_id)}
-                onDblTap={() => onTransplant?.(item.plant_id)}
+                onClick={() => handleItemClick(item.id, item.plant_id)}
+                onTap={() => handleItemClick(item.id, item.plant_id)}
+                onDblClick={() => !selectMode && onTransplant?.(item.plant_id)}
+                onDblTap={() => !selectMode && onTransplant?.(item.plant_id)}
                 onMouseEnter={(e) => handleMouseEnter(item, e)}
                 onMouseLeave={handleMouseLeave}
               >
@@ -266,7 +281,45 @@ export function ZoneCanvas({
                   shadowBlur={6}
                   shadowOpacity={0.4}
                   shadowOffsetY={2}
+                  stroke={isSelected ? "#ef4444" : undefined}
+                  strokeWidth={isSelected ? 4 : 0}
                 />
+
+                {/* Selection Overlay */}
+                {selectMode && (
+                  <Rect
+                    width={CELL_SIZE}
+                    height={CELL_SIZE}
+                    fill={isSelected ? "rgba(239, 68, 68, 0.3)" : "rgba(0, 0, 0, 0.15)"}
+                    cornerRadius={Math.min(12, CELL_SIZE / 8)}
+                  />
+                )}
+
+                {/* Checkmark for selected items */}
+                {isSelected && (
+                  <>
+                    <Rect
+                      x={CELL_SIZE - 24}
+                      y={4}
+                      width={20}
+                      height={20}
+                      fill="#ef4444"
+                      cornerRadius={10}
+                    />
+                    <Text
+                      text="✓"
+                      x={CELL_SIZE - 24}
+                      y={4}
+                      width={20}
+                      height={20}
+                      fontSize={14}
+                      fill="white"
+                      align="center"
+                      verticalAlign="middle"
+                      fontStyle="bold"
+                    />
+                  </>
+                )}
 
                 {/* Stage Indicator Bar */}
                 <Rect
@@ -311,7 +364,7 @@ export function ZoneCanvas({
       </Stage>
 
       {/* Tooltip */}
-      {tooltip.visible && tooltip.plant && tooltip.item && (() => {
+      {tooltip.visible && tooltip.plant && tooltip.item && !selectMode && (() => {
         const assignedContact = tooltip.item.assigned_to
           ? contacts.find(c => c.id === tooltip.item!.assigned_to)
           : null;

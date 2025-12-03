@@ -86,7 +86,7 @@ export default function PlantDetailPage() {
         .select("*")
         .eq("id", plantId)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (plantData) {
         setPlant(plantData);
@@ -95,7 +95,7 @@ export default function PlantDetailPage() {
       const { data: journalData } = await supabase
         .from("journal_entries")
         .select("*")
-        .eq("plant_id", plantId)
+        .eq("plant_id", plantId).limit(1)
         .order("created_at", { ascending: false });
 
       if (journalData) {
@@ -121,8 +121,8 @@ export default function PlantDetailPage() {
       const { data: zoneItemData } = await supabase
         .from("zone_items")
         .select("*")
-        .eq("plant_id", plantId)
-        .single();
+        .eq("plant_id", plantId).limit(1)
+        .maybeSingle();
 
       if (zoneItemData) {
         setZoneItem(zoneItemData);

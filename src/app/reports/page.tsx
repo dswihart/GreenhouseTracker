@@ -24,6 +24,7 @@ export default function ReportsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"count" | "name">("count");
+  const [filterType, setFilterType] = useState<"all" | "tomato" | "pepper" | "other">("all");
 
   useEffect(() => {
     if (!user) return;
@@ -58,11 +59,26 @@ export default function ReportsPage() {
     loadData();
   }, [user]);
 
+// Filter plants by type
+  const filteredPlants = plants.filter(plant => {
+    if (filterType === "all") return true;
+    const name = plant.name.toLowerCase();
+    const species = (plant.species || "").toLowerCase();
+    if (filterType === "tomato") {
+      return name.includes("tomato") || species.includes("tomato");
+    }
+    if (filterType === "pepper") {
+      return name.includes("pepper") || species.includes("pepper");
+    }
+    return !name.includes("tomato") && !species.includes("tomato") && !name.includes("pepper") && !species.includes("pepper");
+  });
+
   // Generate plant summaries
   const plantSummaries: PlantSummary[] = (() => {
     const summaryMap = new Map<string, PlantSummary>();
 
-    plants.forEach((plant) => {
+
+    filteredPlants.forEach((plant) => {
       // Extract base name (remove #N suffix if present)
       const baseName = plant.name.replace(/\s*#\d+$/, "").trim();
       const key = `${baseName}|${plant.species || ""}`;
@@ -72,7 +88,7 @@ export default function ReportsPage() {
           name: baseName,
           species: plant.species,
           count: 0,
-          stages: { seed: 0, seedling: 0, vegetative: 0 },
+          stages: { seed: 0, seedling: 0, vegetative: 0, flowering: 0, harvest_ready: 0 },
           contacts: [],
         });
       }
@@ -108,14 +124,14 @@ export default function ReportsPage() {
   })();
 
   // Calculate totals
-  const totalPlants = plants.length;
+  const totalPlants = filteredPlants.length;
   const totalTypes = plantSummaries.length;
   const totalByStage = plants.reduce(
     (acc, plant) => {
       acc[plant.current_stage]++;
       return acc;
     },
-    { seed: 0, seedling: 0, vegetative: 0 }
+    { seed: 0, seedling: 0, vegetative: 0, flowering: 0, harvest_ready: 0 }
   );
   const plantsWithContacts = plants.filter((p) => p.contact_id).length;
 
@@ -153,6 +169,7 @@ export default function ReportsPage() {
           <span className="text-3xl">📊</span> Plant Reports
         </h2>
         <p className="text-slate-400 mt-1">Overview of your garden statistics</p>
+        <button onClick={() => window.print()} className="mt-3 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl text-sm font-medium print:hidden">📄 Export PDF</button>
       </div>
 
       {/* Summary Cards */}
@@ -184,7 +201,7 @@ export default function ReportsPage() {
         <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
           <span className="text-xl">📈</span> Growth Stage Breakdown
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-5 gap-3">
           <div className="bg-amber-900/30 rounded-xl p-4 text-center border border-amber-600/30">
             <span className="text-3xl">🌰</span>
             <div className="text-2xl font-bold mt-2 text-amber-300">{totalByStage.seed}</div>
@@ -200,7 +217,17 @@ export default function ReportsPage() {
             <div className="text-2xl font-bold mt-2 text-green-300">{totalByStage.vegetative}</div>
             <div className="text-sm text-green-400/80">Vegetative</div>
           </div>
-        </div>
+<div className="bg-pink-900/30 rounded-xl p-4 text-center border border-pink-600/30">
+            <span className="text-3xl">🌸</span>
+            <div className="text-2xl font-bold mt-2 text-pink-300">{totalByStage.flowering}</div>
+            <div className="text-sm text-pink-400/80">Flowering</div>
+          </div>
+          <div className="bg-orange-900/30 rounded-xl p-4 text-center border border-orange-600/30">
+            <span className="text-3xl">🍅</span>
+            <div className="text-2xl font-bold mt-2 text-orange-300">{totalByStage.harvest_ready}</div>
+            <div className="text-sm text-orange-400/80">Ready</div>
+          </div>
+          </div>
       </section>
 
       {/* Plants By Type */}
@@ -230,6 +257,12 @@ export default function ReportsPage() {
             >
               By Name
             </button>
+</div>
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setFilterType("all")} className={`px-3 py-1 text-sm rounded-lg transition-colors ${filterType === "all" ? "bg-purple-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>All</button>
+            <button onClick={() => setFilterType("tomato")} className={`px-3 py-1 text-sm rounded-lg transition-colors ${filterType === "tomato" ? "bg-purple-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>🍅 Tomatoes</button>
+            <button onClick={() => setFilterType("pepper")} className={`px-3 py-1 text-sm rounded-lg transition-colors ${filterType === "pepper" ? "bg-purple-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>🌶️ Peppers</button>
+            <button onClick={() => setFilterType("other")} className={`px-3 py-1 text-sm rounded-lg transition-colors ${filterType === "other" ? "bg-purple-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>Other</button>
           </div>
         </div>
 

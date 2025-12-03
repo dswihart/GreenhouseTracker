@@ -81,6 +81,9 @@ export default function ZoneDetailPage() {
   const [assignToOnAdd, setAssignToOnAdd] = useState<string | null>(null);
   const [dragOverContact, setDragOverContact] = useState<string | null>(null);
   const [showCompanionPanel, setShowCompanionPanel] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedForDelete, setSelectedForDelete] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const zoneId = params.id as string;
   const zone = zones.find((z) => z.id === zoneId);
@@ -492,6 +495,29 @@ export default function ZoneDetailPage() {
     alert("No empty cells in target tray!");
   };
 
+const handleToggleSelect = (itemId: string) => {
+    setSelectedForDelete(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    for (const itemId of selectedForDelete) {
+      await supabase.from("zone_items").delete().eq("id", itemId);
+      removeZoneItem(itemId);
+    }
+    setSelectedForDelete([]);
+    setDeleteMode(false);
+    setShowDeleteConfirm(false);
+  };
+
+  const exitDeleteMode = () => {
+    setDeleteMode(false);
+    setSelectedForDelete([]);
+  };
+
   const reloadData = async () => {
     const { data: itemsData } = await supabase.from("zone_items").select("*");
     if (itemsData) {
@@ -722,6 +748,21 @@ export default function ZoneDetailPage() {
               </p>
             </div>
             <div className="flex gap-2">
+{deleteMode ? (
+                <button
+                  onClick={exitDeleteMode}
+                  className="px-3 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  onClick={() => setDeleteMode(true)}
+                  className="px-3 py-2 bg-amber-900/30 hover:bg-amber-900/50 text-amber-400 rounded-lg text-sm"
+                >
+                  Select
+                </button>
+              )}
               <button
                 onClick={() => {
                   setEditingTray(activeTray);
@@ -754,6 +795,9 @@ export default function ZoneDetailPage() {
                 onTransplant={isGreenhouse ? handleTransplantClick : undefined}
                 onPlantClick={(plantId) => router.push(`/plants/${plantId}`)}
                 contacts={contacts}
+                selectMode={deleteMode}
+                selectedItems={selectedForDelete}
+                onToggleSelect={handleToggleSelect}
               />
             )}
           </div>
@@ -870,6 +914,50 @@ export default function ZoneDetailPage() {
       )}
       {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={availablePlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }} allPlants={plants}
           allPlants={plants}        />      )}
+n      {/* Floating Delete Button */}
+      {deleteMode && selectedForDelete.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="bg-red-600 hover:bg-red-500 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-red-900/50 flex items-center gap-3"
+          >
+            <span>🗑️</span>
+            Delete {selectedForDelete.length} Plant{selectedForDelete.length !== 1 ? "s" : ""}
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl p-6">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold mb-2">Remove Plants?</h2>
+              <p className="text-slate-400">
+                Are you sure you want to remove {selectedForDelete.length} plant{selectedForDelete.length !== 1 ? "s" : ""} from this tray?
+              </p>
+              <p className="text-slate-500 text-sm mt-2">
+                Plants will be unassigned but not deleted from your collection.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold text-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 bg-red-600 hover:bg-red-500 text-white py-4 rounded-xl font-bold text-lg"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

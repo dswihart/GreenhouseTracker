@@ -103,3 +103,20 @@ h3 { font-size: 1.5rem !important; }
     grid-template-columns: repeat(3, 1fr) !important;
   }
 }
+
+/* Print Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  nav, header, footer, .no-print {
+    display: none !important;
+  }
+  @page {
+    margin: 1cm;
+  }
+}

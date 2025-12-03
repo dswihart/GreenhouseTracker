@@ -6,7 +6,7 @@ import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabase/client";
 import type { Contact, Plant } from "@/lib/supabase/types";
 
-const defaultColors = ["#3b82f6", "#10b981", "#eab308", "#ec4899", "#ffffff", "#8b5cf6", "#14b8a6", "#f59e0b"];
+const defaultColors = ["#3b82f6", "#10b981", "#eab308", "#ec4899", "#ef4444", "#8b5cf6", "#14b8a6", "#f59e0b", "#06b6d4", "#84cc16", "#f97316", "#6366f1", "#ffffff"];
 
 interface PlantPlan {
   plantId: string;
@@ -25,6 +25,7 @@ export default function PlanningPage() {
   const [selectedColor, setSelectedColor] = useState(defaultColors[0]);
   const [addingPerson, setAddingPerson] = useState(false);
   const [editingPlant, setEditingPlant] = useState<Plant | null>(null);
+  const [activeTab, setActiveTab] = useState<"tomatoes" | "others">("tomatoes");
 
   // Load plans from localStorage
   useEffect(() => {
@@ -186,7 +187,7 @@ export default function PlanningPage() {
               <div>
                 <label className="block text-sm text-slate-400 mb-2">Color</label>
                 <div className="flex gap-2 flex-wrap">
-                  {defaultColors.slice(0, 5).map((color) => (
+                  {defaultColors.slice(0, 10).map((color) => (
                     <button key={color} onClick={() => setSelectedColor(color)} className={`w-12 h-12 rounded-full transition-all ${selectedColor === color ? "ring-4 ring-white ring-offset-2 ring-offset-slate-800" : ""}`} style={{ backgroundColor: color, border: color === "#ffffff" ? "2px solid #666" : "none" }} />
                   ))}
                 </div>
@@ -272,18 +273,43 @@ export default function PlanningPage() {
         </div>
       )}
 
+      {/* Category Tabs */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setActiveTab("tomatoes")}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-colors ${
+            activeTab === "tomatoes"
+              ? "bg-red-600 text-white"
+              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+          }`}
+        >
+          🍅 Tomatoes & Peppers
+        </button>
+        <button
+          onClick={() => setActiveTab("others")}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-lg transition-colors ${
+            activeTab === "others"
+              ? "bg-green-600 text-white"
+              : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+          }`}
+        >
+          🌿 Others
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
           <div className="text-3xl font-bold text-green-400">{plants.filter(p => {
               const cat = (p.category || "").toLowerCase();
               const name = (p.name || "").toLowerCase();
-              return cat === "tomato" || cat === "pepper" || 
+              const isTomatoOrPepper = cat === "tomato" || cat === "pepper" || 
                      name.includes("tomato") || name.includes("pepper") ||
                      name.includes("jalap") || name.includes("habanero") ||
                      name.includes("cayenne") || name.includes("bell");
+              return activeTab === "tomatoes" ? isTomatoOrPepper : !isTomatoOrPepper;
             }).length}</div>
-          <div className="text-slate-400 text-sm">Tomatoes & Peppers</div>
+          <div className="text-slate-400 text-sm">{activeTab === "tomatoes" ? "Tomatoes & Peppers" : "Other Plants"}</div>
         </div>
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
           <div className="text-3xl font-bold text-blue-400">{contacts.length}</div>
@@ -342,10 +368,20 @@ export default function PlanningPage() {
               {plants.filter(p => {
               const cat = (p.category || "").toLowerCase();
               const name = (p.name || "").toLowerCase();
-              return cat === "tomato" || cat === "pepper" || 
+              const isTomatoOrPepper = cat === "tomato" || cat === "pepper" || 
                      name.includes("tomato") || name.includes("pepper") ||
                      name.includes("jalap") || name.includes("habanero") ||
                      name.includes("cayenne") || name.includes("bell");
+              return activeTab === "tomatoes" ? isTomatoOrPepper : !isTomatoOrPepper;
+            }).sort((a, b) => {
+              if (activeTab === "tomatoes") {
+                // Sort tomatoes first, then peppers
+                const aIsTomato = (a.category || "").toLowerCase() === "tomato" || (a.name || "").toLowerCase().includes("tomato");
+                const bIsTomato = (b.category || "").toLowerCase() === "tomato" || (b.name || "").toLowerCase().includes("tomato");
+                if (aIsTomato && !bIsTomato) return -1;
+                if (!aIsTomato && bIsTomato) return 1;
+              }
+              return a.name.localeCompare(b.name);
             }).map((plant) => {
                 const plan = getPlan(plant.id);
                 return (

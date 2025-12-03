@@ -1,0 +1,1 @@
+ALTER TABLE plants ADD COLUMN IF NOT EXISTS label_name TEXT;
