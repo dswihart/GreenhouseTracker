@@ -365,10 +365,9 @@ export default function ZoneDetailPage() {
           .single();
         if (newPlant && !error) {
           setPlants([...plants, newPlant]);
-          await handleAddToZone(newPlant.id, addQuantity, assignToOnAdd);
-          setImportSuccess(`Added ${addQuantity}x ${data.name}`);
+          await handleAddToZone(newPlant.id, 1, assignToOnAdd);
+          setImportSuccess(`Added ${data.name}`);
           setUrlInput("");
-          setAddQuantity(1);
         }
       } else {
         setImportError("Could not extract plant info from URL.");
@@ -808,6 +807,13 @@ function TrayModal({
   const [name, setName] = useState(tray?.name || "");
   const [rows, setRows] = useState(tray?.rows || 4);
   const [cols, setCols] = useState(tray?.cols || 6);
+
+  // Sync state when tray prop changes (fixes iPad editing issue)
+  useEffect(() => {
+    setName(tray?.name || "");
+    setRows(tray?.rows || 4);
+    setCols(tray?.cols || 6);
+  }, [tray]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
