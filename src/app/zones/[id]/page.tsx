@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase/client";
 import { TransplantModal } from "@/components/TransplantModal";
 import type { Zone, ZoneItem, ZoneType, Contact, Tray } from "@/lib/supabase/types";
 import { AddPlantFlow } from "@/components/AddPlantFlow";
+import { analyzeTrayCompanions, getCompanionRelation, type CompanionAnalysis } from "@/lib/companionPlanting";
 
 const ZoneCanvas = dynamic(
   () => import("@/components/ZoneCanvas").then((mod) => mod.ZoneCanvas),
@@ -79,6 +80,7 @@ export default function ZoneDetailPage() {
   const [importSuccess, setImportSuccess] = useState("");
   const [assignToOnAdd, setAssignToOnAdd] = useState<string | null>(null);
   const [dragOverContact, setDragOverContact] = useState<string | null>(null);
+  const [showCompanionPanel, setShowCompanionPanel] = useState(false);
 
   const zoneId = params.id as string;
   const zone = zones.find((z) => z.id === zoneId);
@@ -217,7 +219,7 @@ export default function ZoneDetailPage() {
             .select()
             .single();
 
-          if (data && !error) {
+          if (error) { console.error('Tray creation failed:', error); alert('Failed to create tray: ' + error.message); return; } if (data) {
             addZoneItem(data);
           }
           return;
@@ -227,7 +229,7 @@ export default function ZoneDetailPage() {
     alert("No empty cells available in this tray!");
   };
 
-  const handleAddToZoneAtPosition = async (plantId: string, x: number, y: number, contactId: string | null) => {    if (!zone || !activeTray) return;    const today = new Date().toISOString().split("T")[0];    await supabase.from("plants").update({ date_planted: today }).eq("id", plantId);    const updatedPlants = plants.map((p) => p.id === plantId ? { ...p, date_planted: today } : p);    setPlants(updatedPlants);    const { data, error } = await supabase.from("zone_items").insert({ zone_id: zoneId, plant_id: plantId, tray_id: activeTray.id, x, y, assigned_to: contactId }).select().single();    if (data && !error) { addZoneItem(data); }  };
+  const handleAddToZoneAtPosition = async (plantId: string, x: number, y: number, contactId: string | null) => {    if (!zone || !activeTray) return;    const today = new Date().toISOString().split("T")[0];    await supabase.from("plants").update({ date_planted: today }).eq("id", plantId);    const updatedPlants = plants.map((p) => p.id === plantId ? { ...p, date_planted: today } : p);    setPlants(updatedPlants);    const { data, error } = await supabase.from("zone_items").insert({ zone_id: zoneId, plant_id: plantId, tray_id: activeTray.id, x, y, assigned_to: contactId }).select().single();    if (error) { console.error('Tray creation failed:', error); alert('Failed to create tray: ' + error.message); return; } if (data) { addZoneItem(data); }  };
   const handleRemoveFromZone = async (itemId: string) => {
     await supabase.from("zone_items").delete().eq("id", itemId);
     removeZoneItem(itemId);
@@ -410,7 +412,7 @@ export default function ZoneDetailPage() {
       .select()
       .single();
 
-    if (data && !error) {
+    if (error) { console.error('Tray creation failed:', error); alert('Failed to create tray: ' + error.message); return; } if (data) {
       addTray(data);
       setActiveTray(data.id);
     }
@@ -630,6 +632,64 @@ export default function ZoneDetailPage() {
         </div>
       </div>
 
+
+      {/* Companion Planting Panel */}
+      {activeTray && itemsForActiveTray.length > 1 && (() => {
+        const plantsWithCoords = itemsForActiveTray.map(item => {
+          const plant = plants.find(p => p.id === item.plant_id);
+          return plant ? { id: item.id, name: plant.name, x: item.x, y: item.y } : null;
+        }).filter(Boolean) as { id: string; name: string; x: number; y: number }[];
+
+        const analysis = analyzeTrayCompanions(plantsWithCoords);
+
+        if (analysis.warnings.length === 0 && analysis.suggestions.length === 0) return null;
+
+        return (
+          <div className="mb-4">
+            <button
+              onClick={() => setShowCompanionPanel(!showCompanionPanel)}
+              className={`w-full p-3 rounded-xl flex items-center justify-between transition-colors ${
+                analysis.warnings.length > 0
+                  ? "bg-amber-900/30 border border-amber-600/50 hover:bg-amber-900/40"
+                  : "bg-green-900/30 border border-green-600/50 hover:bg-green-900/40"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{analysis.warnings.length > 0 ? "⚠️" : "🌿"}</span>
+                <span className="font-medium">
+                  {analysis.warnings.length > 0
+                    ? `${analysis.warnings.length} companion warning${analysis.warnings.length > 1 ? "s" : ""}`
+                    : `${analysis.suggestions.length} good pairing${analysis.suggestions.length > 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <span className="text-slate-400">{showCompanionPanel ? "▲" : "▼"}</span>
+            </button>
+
+            {showCompanionPanel && (
+              <div className="mt-2 space-y-2">
+                {analysis.warnings.map((w, i) => (
+                  <div key={`w-${i}`} className="bg-red-900/20 border border-red-700/30 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-red-300 font-medium">
+                      <span>⚠️</span>
+                      <span>{w.plant1} + {w.plant2}</span>
+                    </div>
+                    <p className="text-sm text-red-200/70 mt-1">{w.message}</p>
+                  </div>
+                ))}
+                {analysis.suggestions.map((s, i) => (
+                  <div key={`s-${i}`} className="bg-green-900/20 border border-green-700/30 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-green-300 font-medium">
+                      <span>✓</span>
+                      <span>{s.plant1} + {s.plant2}</span>
+                    </div>
+                    <p className="text-sm text-green-200/70 mt-1">{s.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {/* Active Tray Content */}
       {activeTray ? (
         <div className="bg-slate-800 rounded-2xl border-2 border-slate-700 overflow-hidden">
@@ -788,7 +848,8 @@ export default function ZoneDetailPage() {
           }}
         />
       )}
-      {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={unplacedPlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }}        />      )}
+      {/* Add Plant Flow */}      {showAddPlantFlow && activeTray && (        <AddPlantFlow          unplacedPlants={unplacedPlants}          tray={activeTray}          existingItems={itemsForActiveTray}          contacts={contacts}          onClose={() => setShowAddPlantFlow(false)}          onAddPlant={async (plantId, x, y, contactId) => { await handleAddToZoneAtPosition(plantId, x, y, contactId); }}
+          allPlants={plants}        />      )}
     </div>
   );
 }
@@ -852,26 +913,20 @@ function TrayModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Columns</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={cols}
-                onChange={(e) => { const v = parseInt(e.target.value); setCols(isNaN(v) ? 6 : Math.max(1, Math.min(20, v))); }}
-                className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
-              />
+              <label className="block text-sm text-slate-400 mb-2 text-center">Columns</label>
+              <div className="flex items-center justify-center gap-3">
+                <button type="button" onClick={() => setCols(c => Math.max(1, c - 1))} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">−</button>
+                <span className="text-3xl font-bold w-12 text-center">{cols}</span>
+                <button type="button" onClick={() => setCols(c => Math.min(20, c + 1))} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">+</button>
+              </div>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Rows</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={rows}
-                onChange={(e) => { const v = parseInt(e.target.value); setRows(isNaN(v) ? 4 : Math.max(1, Math.min(20, v))); }}
-                className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
-              />
+              <label className="block text-sm text-slate-400 mb-2 text-center">Rows</label>
+              <div className="flex items-center justify-center gap-3">
+                <button type="button" onClick={() => setRows(r => Math.max(1, r - 1))} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">−</button>
+                <span className="text-3xl font-bold w-12 text-center">{rows}</span>
+                <button type="button" onClick={() => setRows(r => Math.min(20, r + 1))} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">+</button>
+              </div>
             </div>
           </div>
 

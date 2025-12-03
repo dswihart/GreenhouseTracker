@@ -218,7 +218,7 @@ export default function ZonesPage() {
           onCreated={async (zone) => {
             addZone(zone);
             // Auto-create a default tray for the new zone
-            const { data: newTray } = await supabase
+            const { data: newTray, error: trayError } = await supabase
               .from("trays")
               .insert({
                 zone_id: zone.id,
@@ -229,7 +229,7 @@ export default function ZonesPage() {
               })
               .select()
               .single();
-            if (newTray) {
+            if (trayError) { console.error('Tray creation failed:', trayError); alert('Zone created but tray failed: ' + trayError.message); } if (newTray) {
               setTrays([...trays, newTray]);
             }
             setShowCreateForm(false);
@@ -337,30 +337,20 @@ function CreateZoneModal({
             <p className="text-sm text-slate-400 mb-3">You can add more trays later with different sizes.</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Columns</label>
-                <input
-                  type="number"
-                  min="2"
-                  max="20"
-                  value={formData.cols}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cols: parseInt(e.target.value) || 6 })
-                  }
-                  className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
-                />
+                <label className="block text-sm text-slate-400 mb-2 text-center">Columns</label>
+                <div className="flex items-center justify-center gap-3">
+                  <button type="button" onClick={() => setFormData({ ...formData, cols: Math.max(2, formData.cols - 1) })} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">−</button>
+                  <span className="text-3xl font-bold w-12 text-center">{formData.cols}</span>
+                  <button type="button" onClick={() => setFormData({ ...formData, cols: Math.min(20, formData.cols + 1) })} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">+</button>
+                </div>
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">Rows</label>
-                <input
-                  type="number"
-                  min="2"
-                  max="20"
-                  value={formData.rows}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rows: parseInt(e.target.value) || 4 })
-                  }
-                  className="w-full px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-lg text-center"
-                />
+                <label className="block text-sm text-slate-400 mb-2 text-center">Rows</label>
+                <div className="flex items-center justify-center gap-3">
+                  <button type="button" onClick={() => setFormData({ ...formData, rows: Math.max(2, formData.rows - 1) })} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">−</button>
+                  <span className="text-3xl font-bold w-12 text-center">{formData.rows}</span>
+                  <button type="button" onClick={() => setFormData({ ...formData, rows: Math.min(20, formData.rows + 1) })} className="w-14 h-14 bg-slate-600 hover:bg-slate-500 active:bg-slate-400 rounded-xl text-2xl font-bold transition-colors select-none">+</button>
+                </div>
               </div>
             </div>
           </div>

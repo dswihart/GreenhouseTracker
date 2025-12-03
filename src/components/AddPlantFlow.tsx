@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Plant, Contact, Tray, ZoneItem } from "@/lib/supabase/types";
+import { getCompanionRelation, getCompanions } from "@/lib/companionPlanting";
 
 interface AddPlantFlowProps {
   unplacedPlants: Plant[];
@@ -10,9 +11,11 @@ interface AddPlantFlowProps {
   contacts: Contact[];
   onClose: () => void;
   onAddPlant: (plantId: string, x: number, y: number, contactId: string | null) => Promise<void>;
+  allPlants?: Plant[];
 }
 
 type Step = "select-plant" | "select-slot" | "select-person";
+type Mode = "single" | "bulk";
 
 export function AddPlantFlow({
   unplacedPlants,
@@ -21,21 +24,21 @@ export function AddPlantFlow({
   contacts,
   onClose,
   onAddPlant,
+  allPlants = [],
 }: AddPlantFlowProps) {
+  const [mode, setMode] = useState<Mode>("single");
   const [step, setStep] = useState<Step>("select-plant");
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ x: number; y: number } | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<Array<{ x: number; y: number }>>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  // Multi-plant tracking
   const [addedPlants, setAddedPlants] = useState<string[]>([]);
   const [addedSlots, setAddedSlots] = useState<Array<{x: number, y: number}>>([]);
   const [lastPerson, setLastPerson] = useState<string | null>(null);
 
-  // Filter plants already added in this session
   const availablePlants = unplacedPlants.filter(p => !addedPlants.includes(p.id));
-
   const filteredPlants = availablePlants.filter((plant) =>
     plant.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -45,6 +48,25 @@ export function AddPlantFlow({
            addedSlots.some((slot) => slot.x === x && slot.y === y);
   };
 
+  const isSlotSelected = (x: number, y: number) => {
+    return selectedSlots.some((slot) => slot.x === x && slot.y === y);
+  };
+
+  const getAdjacentPlants = (x: number, y: number) => {
+    const adjacent: Plant[] = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const item = existingItems.find(i => i.x === x + dx && i.y === y + dy);
+        if (item) {
+          const plant = allPlants.find(p => p.id === item.plant_id);
+          if (plant) adjacent.push(plant);
+        }
+      }
+    }
+    return adjacent;
+  };
+
   const handleSelectPlant = (plant: Plant) => {
     setSelectedPlant(plant);
     setStep("select-slot");
@@ -52,31 +74,69 @@ export function AddPlantFlow({
 
   const handleSelectSlot = (x: number, y: number) => {
     if (isSlotOccupied(x, y)) return;
-    setSelectedSlot({ x, y });
+
+    if (mode === "bulk") {
+      if (isSlotSelected(x, y)) {
+        setSelectedSlots(selectedSlots.filter(s => s.x !== x || s.y !== y));
+      } else {
+        setSelectedSlots([...selectedSlots, { x, y }]);
+      }
+    } else {
+      setSelectedSlot({ x, y });
+      if (contacts.length > 0) {
+        setStep("select-person");
+      } else {
+        finishAddingPlant(selectedPlant!.id, x, y, null);
+      }
+    }
+  };
+
+  const handleBulkConfirm = () => {
+    if (selectedSlots.length === 0 || !selectedPlant) return;
     if (contacts.length > 0) {
       setStep("select-person");
     } else {
-      // No contacts, add directly
-      finishAddingPlant(selectedPlant!.id, x, y, null);
+      finishBulkAdd(null);
     }
   };
 
   const handleSelectPerson = (contactId: string | null) => {
-    if (!selectedPlant || !selectedSlot) return;
-    finishAddingPlant(selectedPlant.id, selectedSlot.x, selectedSlot.y, contactId);
+    if (mode === "bulk") {
+      finishBulkAdd(contactId);
+    } else {
+      if (!selectedPlant || !selectedSlot) return;
+      finishAddingPlant(selectedPlant.id, selectedSlot.x, selectedSlot.y, contactId);
+    }
+  };
+
+  const finishBulkAdd = async (contactId: string | null) => {
+    if (!selectedPlant || selectedSlots.length === 0) return;
+    setIsAdding(true);
+    try {
+      for (const slot of selectedSlots) {
+        await onAddPlant(selectedPlant.id, slot.x, slot.y, contactId);
+      }
+      setAddedPlants(prev => [...prev, selectedPlant.id]);
+      setAddedSlots(prev => [...prev, ...selectedSlots]);
+      setLastPerson(contactId);
+      setSelectedPlant(null);
+      setSelectedSlots([]);
+      setSearchTerm("");
+      setStep("select-plant");
+    } catch (error) {
+      console.error("Failed to add plants:", error);
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const finishAddingPlant = async (plantId: string, x: number, y: number, contactId: string | null) => {
     setIsAdding(true);
     try {
       await onAddPlant(plantId, x, y, contactId);
-
-      // Track what was added
       setAddedPlants(prev => [...prev, plantId]);
       setAddedSlots(prev => [...prev, { x, y }]);
       setLastPerson(contactId);
-
-      // Reset for next plant
       setSelectedPlant(null);
       setSelectedSlot(null);
       setSearchTerm("");
@@ -93,92 +153,96 @@ export function AddPlantFlow({
     return contacts.find((c) => c.id === contactId)?.name || null;
   };
 
-  // Grid cell size
-  const maxCellSize = 80;
-  const cellSize = Math.min(maxCellSize, Math.floor(320 / Math.max(tray.cols, tray.rows)));
-
-  const addedCount = addedPlants.length;
+  // LARGER cells for easier tapping
+  const maxCellSize = 56;
+  const cellSize = Math.min(maxCellSize, Math.floor(280 / Math.max(tray.cols, tray.rows)));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-slate-800 rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-700">
+      <div className="relative w-full max-w-lg bg-slate-800 rounded-3xl shadow-2xl max-h-[95vh] overflow-hidden">
+        {/* Header - LARGER text */}
+        <div className="p-5 border-b border-slate-700">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">Add Plants to Tray</h2>
-              <p className="text-slate-400 mt-1">{tray.name}</p>
-            </div>
+            <h2 className="text-2xl font-bold">Add Plants</h2>
             <button
               onClick={onClose}
-              className="w-12 h-12 flex items-center justify-center text-2xl text-slate-400 hover:text-white bg-slate-700 rounded-full"
+              className="w-14 h-14 flex items-center justify-center text-3xl text-slate-400 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-full active:bg-slate-500"
             >
               ✕
             </button>
           </div>
 
-          {addedCount > 0 && (
-            <div className="mt-3 flex items-center gap-2 text-green-400">
-              <span className="text-2xl">✓</span>
-              <span className="text-lg font-medium">
-                {addedCount} plant{addedCount !== 1 ? "s" : ""} added
-              </span>
+          {/* Mode Toggle - BIGGER buttons */}
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={() => { setMode("single"); setSelectedSlots([]); }}
+              className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold transition-colors ${
+                mode === "single"
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              One at a Time
+            </button>
+            <button
+              onClick={() => { setMode("bulk"); setSelectedSlot(null); }}
+              className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold transition-colors ${
+                mode === "bulk"
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              Fill Multiple
+            </button>
+          </div>
+
+          {addedSlots.length > 0 && (
+            <div className="mt-4 flex items-center gap-3 text-green-400 bg-green-900/30 p-3 rounded-xl">
+              <span className="text-3xl">✓</span>
+              <span className="text-xl font-bold">{addedSlots.length} plant{addedSlots.length !== 1 ? "s" : ""} added!</span>
             </div>
           )}
-
-          {/* Progress */}
-          <div className="flex items-center gap-2 mt-4">
-            <div className={`flex-1 h-2 rounded-full ${step === "select-plant" || step === "select-slot" || step === "select-person" ? "bg-green-500" : "bg-slate-600"}`} />
-            <div className={`flex-1 h-2 rounded-full ${step === "select-slot" || step === "select-person" ? "bg-green-500" : "bg-slate-600"}`} />
-            {contacts.length > 0 && (
-              <div className={`flex-1 h-2 rounded-full ${step === "select-person" ? "bg-green-500" : "bg-slate-600"}`} />
-            )}
-          </div>
         </div>
 
         {/* Step 1: Select Plant */}
         {step === "select-plant" && (
-          <div className="p-6 overflow-y-auto" style={{ maxHeight: "60vh" }}>
-            <h3 className="text-xl font-semibold mb-4">1. Choose a Plant</h3>
+          <div className="p-5 overflow-y-auto" style={{ maxHeight: "55vh" }}>
+            <h3 className="text-xl font-bold mb-4">
+              Step 1: Pick a Plant
+            </h3>
 
             {availablePlants.length === 0 ? (
               <div className="text-center py-8">
-                <div className="text-5xl mb-4">✓</div>
-                <p className="text-slate-300 text-lg font-medium">
-                  {addedCount > 0 ? "All done!" : "All plants are already placed!"}
+                <div className="text-6xl mb-4">✓</div>
+                <p className="text-slate-300 text-xl font-medium">
+                  {addedSlots.length > 0 ? "All done!" : "All plants placed!"}
                 </p>
               </div>
             ) : (
               <>
-                {lastPerson && (
-                  <div className="mb-4 p-3 bg-slate-700/50 rounded-xl text-sm">
-                    Assigning to: <span className="font-semibold">{getPersonName(lastPerson)}</span>
-                    <button onClick={() => setLastPerson(null)} className="ml-2 text-slate-400 hover:text-white">(change)</button>
-                  </div>
-                )}
-
                 <input
                   type="text"
-                  placeholder="Search plants..."
+                  placeholder="Type to search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-5 py-4 bg-slate-700 border-2 border-slate-600 rounded-xl text-lg mb-4"
+                  className="w-full px-5 py-4 bg-slate-700 border-2 border-slate-600 rounded-xl text-xl mb-4 focus:border-green-500 focus:outline-none"
                 />
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {filteredPlants.map((plant) => (
                     <button
                       key={plant.id}
                       onClick={() => handleSelectPlant(plant)}
-                      className="w-full flex items-center gap-4 px-5 py-4 bg-slate-700 hover:bg-slate-600 rounded-xl text-left"
+                      className="w-full flex items-center gap-4 px-5 py-5 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-2xl text-left transition-colors"
                     >
-                      <span className="text-3xl">🌱</span>
-                      <div>
-                        <div className="text-lg font-semibold">{plant.name}</div>
-                        {plant.species && <div className="text-slate-400">{plant.species}</div>}
+                      <span className="text-4xl">🌱</span>
+                      <div className="flex-1">
+                        <div className="text-xl font-bold">{plant.name}</div>
+                        {plant.species && <div className="text-lg text-slate-400">{plant.species}</div>}
                       </div>
+                      <span className="text-3xl text-slate-500">→</span>
                     </button>
                   ))}
                 </div>
@@ -187,124 +251,176 @@ export function AddPlantFlow({
           </div>
         )}
 
-        {/* Step 2: Select Slot */}
+        {/* Step 2: Select Slot(s) */}
         {step === "select-slot" && selectedPlant && (
-          <div className="p-6">
-            <button onClick={() => setStep("select-plant")} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4">
-              <span>←</span> Back
+          <div className="p-5">
+            <button
+              onClick={() => { setStep("select-plant"); setSelectedSlots([]); }}
+              className="flex items-center gap-2 text-lg text-green-400 hover:text-green-300 mb-4 py-2"
+            >
+              <span className="text-2xl">←</span> Back to Plants
             </button>
 
-            <h3 className="text-xl font-semibold mb-2">2. Choose a Slot</h3>
-            <p className="text-slate-400 mb-4">Tap where to place {selectedPlant.name}</p>
+            <h3 className="text-xl font-bold mb-2">
+              Step 2: {mode === "bulk" ? "Tap Cells to Fill" : "Pick a Spot"}
+            </h3>
+            <p className="text-lg text-slate-300 mb-4">
+              Placing: <span className="font-bold text-green-400">{selectedPlant.name}</span>
+              {mode === "bulk" && selectedSlots.length > 0 && (
+                <span className="ml-2 text-amber-400">({selectedSlots.length} selected)</span>
+              )}
+            </p>
 
-            <div className="flex justify-center">
+            <div className="flex justify-center mb-4">
               <div
-                className="grid gap-1 p-4 bg-slate-900 rounded-xl"
+                className="grid gap-2 p-4 bg-slate-900 rounded-2xl"
                 style={{ gridTemplateColumns: `repeat(${tray.cols}, ${cellSize}px)` }}
               >
                 {Array.from({ length: tray.rows }).map((_, y) =>
                   Array.from({ length: tray.cols }).map((_, x) => {
                     const occupied = isSlotOccupied(x, y);
+                    const selected = isSlotSelected(x, y);
+                    const adjacentPlants = getAdjacentPlants(x, y);
+                    let borderColor = "border-green-600/50";
+
+                    if (!occupied && selectedPlant && adjacentPlants.length > 0) {
+                      const hasEnemy = adjacentPlants.some(p => getCompanionRelation(selectedPlant.name, p.name) === "enemy");
+                      const hasFriend = adjacentPlants.some(p => getCompanionRelation(selectedPlant.name, p.name) === "friend");
+                      if (hasEnemy) borderColor = "border-red-500 border-4";
+                      else if (hasFriend) borderColor = "border-green-400 border-4";
+                    }
+
                     return (
                       <button
                         key={`${x}-${y}`}
                         onClick={() => handleSelectSlot(x, y)}
                         disabled={occupied}
-                        className={`rounded-lg flex items-center justify-center text-xl font-bold ${
+                        className={`rounded-xl flex items-center justify-center text-2xl font-bold transition-all ${
                           occupied
-                            ? "bg-slate-600 text-slate-500 cursor-not-allowed"
-                            : "bg-green-700/50 hover:bg-green-600 text-white border-2 border-dashed border-green-500"
+                            ? "bg-slate-600 text-slate-400 cursor-not-allowed"
+                            : selected
+                            ? "bg-green-500 text-white border-4 border-green-300"
+                            : `bg-green-800/50 hover:bg-green-600 active:bg-green-500 text-white border-2 border-dashed ${borderColor}`
                         }`}
                         style={{ width: cellSize, height: cellSize }}
                       >
-                        {occupied ? "🌱" : "+"}
+                        {occupied ? "🌱" : selected ? "✓" : ""}
                       </button>
                     );
                   })
                 )}
               </div>
             </div>
+
+            {/* Legend - BIGGER text */}
+            <div className="flex justify-center gap-6 text-base text-slate-300 mb-4">
+              <span className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded border-4 border-green-400 bg-slate-800"></span>
+                Good match
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded border-4 border-red-500 bg-slate-800"></span>
+                Bad match
+              </span>
+            </div>
+
+            {mode === "bulk" && selectedSlots.length > 0 && (
+              <button
+                onClick={handleBulkConfirm}
+                disabled={isAdding}
+                className="w-full py-5 bg-green-600 hover:bg-green-500 active:bg-green-400 text-white text-xl font-bold rounded-2xl disabled:opacity-50"
+              >
+                {isAdding ? "Adding..." : `Plant ${selectedSlots.length} ${selectedPlant.name}`}
+              </button>
+            )}
           </div>
         )}
 
         {/* Step 3: Select Person */}
-        {step === "select-person" && selectedPlant && selectedSlot && (
-          <div className="p-6 overflow-y-auto" style={{ maxHeight: "60vh" }}>
-            <button onClick={() => setStep("select-slot")} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4">
-              <span>←</span> Back
+        {step === "select-person" && selectedPlant && (selectedSlot || selectedSlots.length > 0) && (
+          <div className="p-5 overflow-y-auto" style={{ maxHeight: "55vh" }}>
+            <button
+              onClick={() => setStep("select-slot")}
+              className="flex items-center gap-2 text-lg text-green-400 hover:text-green-300 mb-4 py-2"
+            >
+              <span className="text-2xl">←</span> Back
             </button>
 
-            <h3 className="text-xl font-semibold mb-2">3. Assign to Person</h3>
-            <p className="text-slate-400 mb-4">Who will manage {selectedPlant.name}?</p>
+            <h3 className="text-xl font-bold mb-2">Step 3: Who Manages This?</h3>
+            <p className="text-lg text-slate-300 mb-4">
+              {mode === "bulk"
+                ? `Assign ${selectedSlots.length} plants to someone?`
+                : "Assign this plant to someone?"}
+            </p>
 
             <div className="space-y-3">
-              {/* Quick pick last person */}
+              {/* Skip option - BIGGER */}
+              <button
+                onClick={() => handleSelectPerson(null)}
+                disabled={isAdding}
+                className="w-full flex items-center gap-4 px-5 py-5 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-2xl text-left disabled:opacity-50"
+              >
+                <div className="w-16 h-16 rounded-full bg-slate-600 flex items-center justify-center text-3xl">−</div>
+                <div>
+                  <div className="text-xl font-bold">Skip</div>
+                  <div className="text-lg text-slate-400">No one assigned</div>
+                </div>
+              </button>
+
+              {/* Last person - BIGGER */}
               {lastPerson && (
                 <button
                   onClick={() => handleSelectPerson(lastPerson)}
                   disabled={isAdding}
-                  className="w-full flex items-center gap-4 px-6 py-5 bg-green-700 hover:bg-green-600 rounded-2xl text-left ring-2 ring-green-500 disabled:opacity-50"
+                  className="w-full flex items-center gap-4 px-5 py-5 bg-green-700 hover:bg-green-600 active:bg-green-500 rounded-2xl text-left ring-4 ring-green-400 disabled:opacity-50"
                 >
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white"
+                    className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
                     style={{ backgroundColor: contacts.find(c => c.id === lastPerson)?.color || "#666" }}
                   >
                     {getPersonName(lastPerson)?.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div className="text-xl font-semibold">{getPersonName(lastPerson)}</div>
-                    <div className="text-green-200">Same as last plant</div>
+                    <div className="text-xl font-bold">{getPersonName(lastPerson)}</div>
+                    <div className="text-lg text-green-200">Same as before</div>
                   </div>
                 </button>
               )}
 
-              {/* Skip option */}
-              <button
-                onClick={() => handleSelectPerson(null)}
-                disabled={isAdding}
-                className="w-full flex items-center gap-4 px-6 py-5 bg-slate-700 hover:bg-slate-600 rounded-2xl text-left disabled:opacity-50"
-              >
-                <div className="w-14 h-14 rounded-full bg-slate-600 flex items-center justify-center text-2xl">✕</div>
-                <div>
-                  <div className="text-xl font-semibold">Skip</div>
-                  <div className="text-slate-400">Leave unassigned</div>
-                </div>
-              </button>
-
-              {/* Other contacts */}
+              {/* Other contacts - BIGGER */}
               {contacts.filter(c => c.id !== lastPerson).map((contact) => (
                 <button
                   key={contact.id}
                   onClick={() => handleSelectPerson(contact.id)}
                   disabled={isAdding}
-                  className="w-full flex items-center gap-4 px-6 py-5 bg-slate-700 hover:bg-slate-600 rounded-2xl text-left disabled:opacity-50"
+                  className="w-full flex items-center gap-4 px-5 py-5 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-2xl text-left disabled:opacity-50"
                 >
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white"
+                    className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
                     style={{ backgroundColor: contact.color }}
                   >
                     {contact.name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="text-xl font-semibold">{contact.name}</div>
+                  <div className="text-xl font-bold">{contact.name}</div>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="p-6 border-t border-slate-700">
-          {addedCount > 0 ? (
+        {/* Footer - BIGGER buttons */}
+        <div className="p-5 border-t border-slate-700">
+          {addedSlots.length > 0 ? (
             <button
               onClick={onClose}
-              className="w-full py-5 bg-green-600 hover:bg-green-500 text-white text-xl font-bold rounded-2xl"
+              className="w-full py-5 bg-green-600 hover:bg-green-500 active:bg-green-400 text-white text-2xl font-bold rounded-2xl"
             >
-              Done ({addedCount} added)
+              Done ✓
             </button>
           ) : (
             <button
               onClick={onClose}
-              className="w-full py-4 text-slate-400 hover:text-white text-lg"
+              className="w-full py-4 text-xl text-slate-400 hover:text-white"
             >
               Cancel
             </button>
